@@ -50,5 +50,16 @@ else
     echo "Powerlevel10k is already installed"
 fi
 
+# Clone the zsh-syntax-highlighting plugin
+if [ ! -d "$HOME/zsh-syntax-highlighting" ]; then
+    echo "Installing zsh-syntax-highlighting..."
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $HOME/zsh-syntax-highlighting
+else
+    echo "zsh-syntax-highlighting is already installed"
+fi
+
+# Add zsh-syntax-highlighting to the end of .zshrc
+echo "source ${(q-)PWD}/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" >> ${ZDOTDIR:-$HOME}/.zshrc
+
 # Start a new Zsh shell
 exec zsh
