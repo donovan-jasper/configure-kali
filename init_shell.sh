@@ -50,8 +50,5 @@ else
     echo "Powerlevel10k is already installed"
 fi
 
-# Inform the user that they need to run Zsh to apply changes
-echo "Configuration files have been copied. Please start a new Zsh shell or run 'zsh' to apply the changes."
-
 # Start a new Zsh shell
 exec zsh
