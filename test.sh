@@ -50,8 +50,8 @@ else
     echo "Powerlevel10k is already installed"
 fi
 
-# Source the .zshrc to apply the new configuration
-echo "Sourcing .zshrc to apply changes..."
-source ~/.zshrc
+# Inform the user that they need to run Zsh to apply changes
+echo "Configuration files have been copied. Please start a new Zsh shell or run 'zsh' to apply the changes."
 
-echo "Setup complete. Please restart your terminal if necessary."
+# Start a new Zsh shell
+exec zsh
