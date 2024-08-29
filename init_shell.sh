@@ -59,7 +59,7 @@ else
 fi
 
 # Add zsh-syntax-highlighting to the end of .zshrc
-echo "source ${(q-)PWD}/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" >> ${ZDOTDIR:-$HOME}/.zshrc
+echo "source $HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" >> $HOME/.zshrc
 
 # Start a new Zsh shell
 exec zsh
