@@ -11,6 +11,7 @@ WORDLIST_DIR="/usr/share/seclists/Discovery"
 DIRECTORY_WORDLIST="$WORDLIST_DIR/Web-Content/directory-list-2.3-medium.txt"
 SUBDOMAIN_WORDLIST="$WORDLIST_DIR/DNS/subdomains-top1million-110000.txt"
 ZSHRC="$HOME/.zshrc"
+USER_NAME="${SUDO_USER:-$(whoami)}"
 
 # Function to update package list and install necessary packages
 update_and_install_packages() {
@@ -86,31 +87,33 @@ install_or_update_arsenal() {
         echo "Arsenal directory exists. Pulling latest changes..."
         cd "$ARSENAL_DIR"
         sudo git pull
+        cd -
     fi
 
-    # Navigate to the Arsenal directory
-    cd "$ARSENAL_DIR"
+    # Change ownership to the non-root user
+    echo "Changing ownership of $ARSENAL_DIR to $USER_NAME..."
+    sudo chown -R "$USER_NAME":"$USER_NAME" "$ARSENAL_DIR"
 
-    # Install Python dependencies
+    # Create a Python virtual environment as the non-root user
+    echo "Creating virtual environment for Arsenal..."
+    sudo -u "$USER_NAME" bash -c "cd '$ARSENAL_DIR' && python3 -m venv venv"
+
+    # Install Python dependencies within the virtual environment
     echo "Installing Python dependencies for Arsenal..."
-    sudo python3 -m pip install -r requirements.txt
-    echo "Python dependencies installed successfully."
-
-    # Navigate back to the original directory
-    cd -
+    sudo -u "$USER_NAME" bash -c "source '$ARSENAL_DIR/venv/bin/activate' && pip install --upgrade pip && pip install -r '$ARSENAL_DIR/requirements.txt'"
 
     # Add alias to .zshrc if not already present
-    if grep -q "alias a='python3 $ARSENAL_DIR/run'" "$ZSHRC"; then
+    echo "Adding alias 'a' for 'arsenal' to $ZSHRC..."
+    if sudo -u "$USER_NAME" grep -q "alias a='python3 $ARSENAL_DIR/venv/bin/python $ARSENAL_DIR/run'" "$ZSHRC"; then
         echo "Alias 'a' for 'arsenal' already exists in $ZSHRC."
     else
-        echo "Adding alias 'a' for 'arsenal' to $ZSHRC..."
-        echo "alias a='python3 $ARSENAL_DIR/run'" | sudo tee -a "$ZSHRC" > /dev/null
+        echo "alias a='python3 $ARSENAL_DIR/venv/bin/python $ARSENAL_DIR/run'" | sudo tee -a "$ZSHRC" > /dev/null
         echo "Alias added successfully."
     fi
 
     # Reload zsh configuration
     echo "Reloading zsh configuration..."
-    source "$ZSHRC"
+    sudo -u "$USER_NAME" bash -c "source '$ZSHRC'"
 
     echo "----------------------------------------"
     echo "Arsenal has been installed/updated and is accessible via the 'a' alias."
@@ -129,9 +132,9 @@ install_feroxbuster_scripts() {
     # Function to create a script using here-doc
     create_script() {
         local script_name="$1"
-        local script_path="$DJ_SAPER_DIR/$script_name"
         local script_description="$2"
         local script_content="$3"
+        local script_path="$DJ_SAPER_DIR/$script_name"
 
         if [ -f "$script_path" ]; then
             echo "$script_name already exists. Skipping creation."
@@ -161,27 +164,27 @@ EOL
 
     # Define script contents without quotes for variables
     DIR_WINDOWS_CMD='feroxbuster --url "$INPUT" \
-                -r \
-                -t "$THREADS" \
-                -w '"$DIRECTORY_WORDLIST"' \
-                -C 404,403,400,503,500,501,502 \
-                -x exe,bat,msi,cmd,ps1 \
-                --dont-scan "vendor,fonts,images,css,assets,docs,js,static,img,help"'
+            -r \
+            -t "$THREADS" \
+            -w '"$DIRECTORY_WORDLIST"' \
+            -C 404,403,400,503,500,501,502 \
+            -x exe,bat,msi,cmd,ps1 \
+            --dont-scan "vendor,fonts,images,css,assets,docs,js,static,img,help"'
 
     DIR_LINUX_CMD='feroxbuster --url "$INPUT" \
-                -r \
-                -t "$THREADS" \
-                -w '"$DIRECTORY_WORDLIST"' \
-                -C 404,403,400,503,500,501,502 \
-                -x txt,sh,zip,bak,py,php \
-                --dont-scan "vendor,fonts,images,css,assets,docs,js,static,img,help"'
+            -r \
+            -t "$THREADS" \
+            -w '"$DIRECTORY_WORDLIST"' \
+            -C 404,403,400,503,500,501,502 \
+            -x txt,sh,zip,bak,py,php \
+            --dont-scan "vendor,fonts,images,css,assets,docs,js,static,img,help"'
 
     SUBDOMAIN_CMD='feroxbuster --domain "$INPUT" \
-                -r \
-                -t "$THREADS" \
-                -w '"$SUBDOMAIN_WORDLIST"' \
-                --subdomains \
-                --silent'
+            -r \
+            -t "$THREADS" \
+            -w '"$SUBDOMAIN_WORDLIST"' \
+            --subdomains \
+            --silent'
 
     # Create feroxbuster_windows.sh
     create_script "feroxbuster_windows.sh" "Runs feroxbuster with Windows-specific flags for directory enumeration." "$DIR_WINDOWS_CMD"
@@ -197,63 +200,40 @@ EOL
     echo "----------------------------------------"
 
     # Add /opt/djsaper/ to PATH in zsh if not already present
-    if grep -q 'export PATH=.*\/opt/djsaper/' "$ZSHRC"; then
+    if sudo -u "$USER_NAME" grep -q 'export PATH=.*\/opt/djsaper/' "$ZSHRC"; then
         echo "/opt/djsaper/ is already in your PATH."
     else
         echo "Adding /opt/djsaper/ to PATH in $ZSHRC..."
         echo 'export PATH="$PATH:/opt/djsaper/"' | sudo tee -a "$ZSHRC" > /dev/null
         echo "/opt/djsaper/ added to PATH successfully."
         echo "Reloading zsh configuration..."
-        source "$ZSHRC"
+        sudo -u "$USER_NAME" bash -c "source '$ZSHRC'"
     fi
 }
 
-# Function to install Arsenal via git clone
-install_arsenal_git() {
+# Function to update installed tools
+update_tools() {
     echo "----------------------------------------"
-    echo "Starting installation of Arsenal..."
+    echo "Updating installed tools..."
     echo "----------------------------------------"
+    update_and_install_packages
 
-    if [ ! -d "$ARSENAL_DIR" ]; then
-        echo "Cloning Arsenal repository to $ARSENAL_DIR..."
-        sudo git clone https://github.com/Orange-Cyberdefense/arsenal.git "$ARSENAL_DIR"
+    # Update BloodHound
+    if [ -d "$BLOODHOUND_DIR" ]; then
+        install_or_update_bloodhound
     else
-        echo "Arsenal directory exists. Pulling latest changes..."
-        cd "$ARSENAL_DIR"
-        sudo git pull
-        cd -
+        echo "BloodHound is not installed. Skipping update."
     fi
 
-    # Navigate to the Arsenal directory
-    cd "$ARSENAL_DIR"
-
-    # Install Python dependencies
-    echo "Installing Python dependencies for Arsenal..."
-    sudo python3 -m pip install -r requirements.txt
-    echo "Python dependencies installed successfully."
-
-    # Add alias to .zshrc if not already present
-    if grep -q "alias a='python3 $ARSENAL_DIR/run'" "$ZSHRC"; then
-        echo "Alias 'a' for 'arsenal' already exists in $ZSHRC."
+    # Update Arsenal
+    if [ -d "$ARSENAL_DIR" ]; then
+        install_or_update_arsenal
     else
-        echo "Adding alias 'a' for 'arsenal' to $ZSHRC..."
-        echo "alias a='python3 $ARSENAL_DIR/run'" | sudo tee -a "$ZSHRC" > /dev/null
-        echo "Alias added successfully."
+        echo "Arsenal is not installed. Skipping update."
     fi
 
-    # Reload zsh configuration
-    echo "Reloading zsh configuration..."
-    source "$ZSHRC"
-
     echo "----------------------------------------"
-    echo "Arsenal has been installed and is accessible via the 'a' alias."
-    echo "----------------------------------------"
-}
-
-# Placeholder functions for options 4 (Future Implementations)
-install_option4() {
-    echo "----------------------------------------"
-    echo "Option 4 is not implemented yet."
+    echo "Update process completed."
     echo "----------------------------------------"
 }
 
@@ -276,12 +256,7 @@ handle_selection() {
     case "$choice" in
         1)
             echo "Updating installed tools..."
-            update_and_install_packages
-            install_or_update_bloodhound
-            install_or_update_arsenal
-            echo "----------------------------------------"
-            echo "Tools have been updated successfully."
-            echo "----------------------------------------"
+            update_tools
             ;;
         2)
             install_or_update_bloodhound
@@ -299,7 +274,7 @@ handle_selection() {
             install_feroxbuster_scripts
             install_or_update_arsenal
             echo "----------------------------------------"
-            echo "All tools have been installed successfully."
+            echo "All tools have been installed/updated successfully."
             echo "----------------------------------------"
             ;;
         *)
