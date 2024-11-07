@@ -8,7 +8,7 @@ DJ_SAPER_DIR="/opt/djasper"
 WORDLIST_DIR="/usr/share/seclists/Discovery"
 DIRECTORY_WORDLIST="$WORDLIST_DIR/Web-Content/directory-list-2.3-medium.txt"
 SUBDOMAIN_WORDLIST="$WORDLIST_DIR/DNS/subdomains-top1million-110000.txt"
-VHOST_WORDLIST="$WORDLIST_DIR/Discovery/Web-Content/best-vhosts.txt"  # Example wordlist for vhost
+VHOST_WORDLIST="$WORDLIST_DIR/Web-Content/best-vhosts.txt"  # Example wordlist for vhost
 ZSHRC="$HOME/.zshrc"
 
 # Function to update package list and install necessary packages
@@ -98,7 +98,7 @@ THREADS="${2:-100}"  # Default to 100 threads if not specified
 feroxbuster --url "$URL" \
             -r \
             -t "$THREADS" \
-            -w '"$DIRECTORY_WORDLIST"' \
+            -w "'"$DIRECTORY_WORDLIST"'" \
             -C 404,403,400,503,500,501,502 \
             -x exe,bat,msi,cmd,ps1 \
             --dont-scan "vendor,fonts,images,css,assets,docs,js,static,img,help"
@@ -121,7 +121,7 @@ THREADS="${2:-100}"  # Default to 100 threads if not specified
 feroxbuster --url "$URL" \
             -r \
             -t "$THREADS" \
-            -w '"$DIRECTORY_WORDLIST"' \
+            -w "'"$DIRECTORY_WORDLIST"'" \
             -C 404,403,400,503,500,501,502 \
             -x txt,sh,zip,bak,py,php \
             --dont-scan "vendor,fonts,images,css,assets,docs,js,static,img,help"
@@ -205,7 +205,7 @@ if [[ "$URL" != http://* && "$URL" != https://* ]]; then
 fi
 
 # Example wordlist for vhost enumeration (ensure this exists or adjust the path)
-VHOST_WORDLIST="$WORDLIST_DIR/Web-Content/best-vhosts.txt"
+VHOST_WORDLIST="'$VHOST_WORDLIST'"
 
 # Check if the VHOST_WORDLIST exists
 if [ ! -f "$VHOST_WORDLIST" ]; then
