@@ -96,14 +96,11 @@ install_or_update_arsenal() {
     sudo python3 -m pip install -r requirements.txt
     echo "Python dependencies installed successfully."
 
-    # Optional: Ensure 'arsenal' is installed via pip if required
-    # sudo python3 -m pip install .
-
     # Navigate back to the original directory
     cd -
 
     # Add alias to .zshrc if not already present
-    if grep -q "alias a='arsenal'" "$ZSHRC"; then
+    if grep -q "alias a='python3 $ARSENAL_DIR/run'" "$ZSHRC"; then
         echo "Alias 'a' for 'arsenal' already exists in $ZSHRC."
     else
         echo "Adding alias 'a' for 'arsenal' to $ZSHRC..."
@@ -129,139 +126,90 @@ install_feroxbuster_scripts() {
     # Create the directory if it doesn't exist
     sudo mkdir -p "$DJ_SAPER_DIR"
 
-    # Define script contents
-    FEROS_WINDOWS_CONTENT='#!/bin/bash
-
-# Script: feroxbuster_windows.sh
-# Description: Runs feroxbuster with Windows-specific flags for directory enumeration.
-
-# Check if at least one argument (URL) is provided
-if [ -z "$1" ]; then
-    echo "Usage: feroxbuster_windows.sh <URL> [threads]"
-    exit 1
-fi
-
-URL="$1"
-THREADS="${2:-100}"  # Default to 100 threads if not specified
-
-feroxbuster --url "$URL" \
-            -r \
-            -t "$THREADS" \
-            -w '"$DIRECTORY_WORDLIST"' \
-            -C 404,403,400,503,500,501,502 \
-            -x exe,bat,msi,cmd,ps1 \
-            --dont-scan "vendor,fonts,images,css,assets,docs,js,static,img,help"
-'
-
-    FEROS_LINUX_CONTENT='#!/bin/bash
-
-# Script: feroxbuster_linux.sh
-# Description: Runs feroxbuster with Linux-specific flags for directory enumeration.
-
-# Check if at least one argument (URL) is provided
-if [ -z "$1" ]; then
-    echo "Usage: feroxbuster_linux.sh <URL> [threads]"
-    exit 1
-fi
-
-URL="$1"
-THREADS="${2:-100}"  # Default to 100 threads if not specified
-
-feroxbuster --url "$URL" \
-            -r \
-            -t "$THREADS" \
-            -w '"$DIRECTORY_WORDLIST"' \
-            -C 404,403,400,503,500,501,502 \
-            -x txt,sh,zip,bak,py,php \
-            --dont-scan "vendor,fonts,images,css,assets,docs,js,static,img,help"
-'
-
-    FEROS_SUBDOMAIN_CONTENT='#!/bin/bash
-
-# Script: feroxbuster_subdomain.sh
-# Description: Runs feroxbuster for subdomain enumeration.
-
-# Check if at least one argument (DOMAIN) is provided
-if [ -z "$1" ]; then
-    echo "Usage: feroxbuster_subdomain.sh <DOMAIN> [threads]"
-    exit 1
-fi
-
-DOMAIN="$1"
-THREADS="${2:-100}"  # Default to 100 threads if not specified
-
-feroxbuster --domain "$DOMAIN" \
-            -r \
-            -t "$THREADS" \
-            -w '"$SUBDOMAIN_WORDLIST"' \
-            --subdomains \
-            --silent
-'
-
-    # Function to create a script if it doesn't exist
+    # Function to create a script using here-doc
     create_script() {
         local script_name="$1"
-        local script_content="$2"
+        local script_path="$DJ_SAPER_DIR/$script_name"
+        local script_description="$2"
+        local script_content="$3"
 
-        if [ -f "$DJ_SAPER_DIR/$script_name" ]; then
+        if [ -f "$script_path" ]; then
             echo "$script_name already exists. Skipping creation."
         else
             echo "Creating $script_name..."
-            echo "$script_content" | sudo tee "$DJ_SAPER_DIR/$script_name" > /dev/null
-            sudo chmod +x "$DJ_SAPER_DIR/$script_name"
+            sudo tee "$script_path" > /dev/null <<EOL
+#!/bin/bash
+
+# Script: $script_name
+# Description: $script_description
+
+# Check if at least one argument (URL or DOMAIN) is provided
+if [ -z "\$1" ]; then
+    echo "Usage: $script_name <URL|DOMAIN> [threads]"
+    exit 1
+fi
+
+INPUT="\$1"
+THREADS="\${2:-100}"  # Default to 100 threads if not specified
+
+$script_content
+EOL
+            sudo chmod +x "$script_path"
             echo "$script_name created and made executable."
         fi
     }
 
+    # Define script contents without quotes for variables
+    DIR_WINDOWS_CMD='feroxbuster --url "$INPUT" \
+                -r \
+                -t "$THREADS" \
+                -w '"$DIRECTORY_WORDLIST"' \
+                -C 404,403,400,503,500,501,502 \
+                -x exe,bat,msi,cmd,ps1 \
+                --dont-scan "vendor,fonts,images,css,assets,docs,js,static,img,help"'
+
+    DIR_LINUX_CMD='feroxbuster --url "$INPUT" \
+                -r \
+                -t "$THREADS" \
+                -w '"$DIRECTORY_WORDLIST"' \
+                -C 404,403,400,503,500,501,502 \
+                -x txt,sh,zip,bak,py,php \
+                --dont-scan "vendor,fonts,images,css,assets,docs,js,static,img,help"'
+
+    SUBDOMAIN_CMD='feroxbuster --domain "$INPUT" \
+                -r \
+                -t "$THREADS" \
+                -w '"$SUBDOMAIN_WORDLIST"' \
+                --subdomains \
+                --silent'
+
     # Create feroxbuster_windows.sh
-    create_script "feroxbuster_windows.sh" "$FEROS_WINDOWS_CONTENT"
+    create_script "feroxbuster_windows.sh" "Runs feroxbuster with Windows-specific flags for directory enumeration." "$DIR_WINDOWS_CMD"
 
     # Create feroxbuster_linux.sh
-    create_script "feroxbuster_linux.sh" "$FEROS_LINUX_CONTENT"
+    create_script "feroxbuster_linux.sh" "Runs feroxbuster with Linux-specific flags for directory enumeration." "$DIR_LINUX_CMD"
 
     # Create feroxbuster_subdomain.sh
-    create_script "feroxbuster_subdomain.sh" "$FEROS_SUBDOMAIN_CONTENT"
+    create_script "feroxbuster_subdomain.sh" "Runs feroxbuster for subdomain enumeration." "$SUBDOMAIN_CMD"
 
     echo "----------------------------------------"
     echo "Feroxbuster scripts set up successfully in $DJ_SAPER_DIR."
     echo "----------------------------------------"
-}
 
-# Function to update installed tools
-update_tools() {
-    echo "----------------------------------------"
-    echo "Updating installed tools..."
-    echo "----------------------------------------"
-    update_and_install_packages
-
-    # Update BloodHound
-    if [ -d "$BLOODHOUND_DIR" ]; then
-        install_or_update_bloodhound
+    # Add /opt/djsaper/ to PATH in zsh if not already present
+    if grep -q 'export PATH=.*\/opt/djsaper/' "$ZSHRC"; then
+        echo "/opt/djsaper/ is already in your PATH."
     else
-        echo "BloodHound is not installed. Skipping update."
+        echo "Adding /opt/djsaper/ to PATH in $ZSHRC..."
+        echo 'export PATH="$PATH:/opt/djsaper/"' | sudo tee -a "$ZSHRC" > /dev/null
+        echo "/opt/djsaper/ added to PATH successfully."
+        echo "Reloading zsh configuration..."
+        source "$ZSHRC"
     fi
-
-    # Update Feroxbuster scripts
-    if [ -d "$DJ_SAPER_DIR" ]; then
-        echo "Feroxbuster scripts already exist. No update needed."
-    else
-        echo "Feroxbuster scripts are not installed. Skipping update."
-    fi
-
-    # Update Arsenal
-    if [ -d "$ARSENAL_DIR" ]; then
-        install_or_update_arsenal
-    else
-        echo "Arsenal is not installed. Skipping update."
-    fi
-
-    echo "----------------------------------------"
-    echo "Update process completed."
-    echo "----------------------------------------"
 }
 
 # Function to install Arsenal via git clone
-install_arsenal() {
+install_arsenal_git() {
     echo "----------------------------------------"
     echo "Starting installation of Arsenal..."
     echo "----------------------------------------"
@@ -270,7 +218,10 @@ install_arsenal() {
         echo "Cloning Arsenal repository to $ARSENAL_DIR..."
         sudo git clone https://github.com/Orange-Cyberdefense/arsenal.git "$ARSENAL_DIR"
     else
-        echo "Arsenal directory already exists. Skipping clone."
+        echo "Arsenal directory exists. Pulling latest changes..."
+        cd "$ARSENAL_DIR"
+        sudo git pull
+        cd -
     fi
 
     # Navigate to the Arsenal directory
@@ -299,8 +250,12 @@ install_arsenal() {
     echo "----------------------------------------"
 }
 
-# Function to install Feroxbuster scripts
-# (This function is already defined above as install_feroxbuster_scripts)
+# Placeholder functions for options 4 (Future Implementations)
+install_option4() {
+    echo "----------------------------------------"
+    echo "Option 4 is not implemented yet."
+    echo "----------------------------------------"
+}
 
 # Function to display the menu and get user selection
 show_menu() {
@@ -320,7 +275,13 @@ show_menu() {
 handle_selection() {
     case "$choice" in
         1)
-            update_tools
+            echo "Updating installed tools..."
+            update_and_install_packages
+            install_or_update_bloodhound
+            install_or_update_arsenal
+            echo "----------------------------------------"
+            echo "Tools have been updated successfully."
+            echo "----------------------------------------"
             ;;
         2)
             install_or_update_bloodhound
@@ -329,5 +290,48 @@ handle_selection() {
             install_feroxbuster_scripts
             ;;
         4)
-            install_arsenal
-          
+            install_or_update_arsenal
+            ;;
+        A|a)
+            echo "Installing all tools..."
+            update_and_install_packages
+            install_or_update_bloodhound
+            install_feroxbuster_scripts
+            install_or_update_arsenal
+            echo "----------------------------------------"
+            echo "All tools have been installed successfully."
+            echo "----------------------------------------"
+            ;;
+        *)
+            echo "----------------------------------------"
+            echo "Invalid selection. Please run the script again and choose a valid option."
+            echo "----------------------------------------"
+            exit 1
+            ;;
+    esac
+}
+
+# Main script execution
+main() {
+    echo "========================================"
+    echo "Welcome to the Tool Installation Script"
+    echo "========================================"
+
+    show_menu
+    handle_selection
+
+    echo "----------------------------------------"
+    echo "Installation process completed."
+    echo "----------------------------------------"
+    echo "If you installed Feroxbuster, you can now use the following scripts from anywhere:"
+    echo " - feroxbuster_windows.sh <URL> [threads]"
+    echo " - feroxbuster_linux.sh <URL> [threads]"
+    echo " - feroxbuster_subdomain.sh <DOMAIN> [threads]"
+    echo "----------------------------------------"
+    echo "If you installed Arsenal, you can launch it using the 'a' alias:"
+    echo " - a"
+    echo "----------------------------------------"
+}
+
+# Run the main function
+main
