@@ -4,7 +4,7 @@
 set -e
 
 # Variables
-DJ_SAPER_DIR="/opt/djsaper"
+DJ_SAPER_DIR="/opt/djasper"
 WORDLIST_DIR="/usr/share/seclists/Discovery"
 DIRECTORY_WORDLIST="$WORDLIST_DIR/Web-Content/directory-list-2.3-medium.txt"
 SUBDOMAIN_WORDLIST="$WORDLIST_DIR/DNS/subdomains-top1million-110000.txt"
@@ -16,7 +16,7 @@ update_and_install_packages() {
     echo "Updating package list and installing dependencies..."
     echo "----------------------------------------"
     sudo apt update -y
-    sudo apt install -y docker-compose git feroxbuster seclists
+    sudo apt install -y docker-compose git feroxbuster gobuster seclists
     echo "----------------------------------------"
     echo "Package installation completed."
     echo "----------------------------------------"
@@ -82,12 +82,12 @@ install_feroxbuster_scripts() {
     # Define script contents
     FEROS_WINDOWS_CONTENT='#!/bin/bash
 
-# Script: feroxbuster_windows.sh
-# Description: Runs feroxbuster with Windows-specific flags for directory enumeration.
+# Script: feroxbuster_windows
+# Description: Runs Feroxbuster with Windows-specific flags for directory enumeration.
 
 # Check if at least one argument (URL) is provided
 if [ -z "$1" ]; then
-    echo "Usage: feroxbuster_windows.sh <URL> [threads]"
+    echo "Usage: feroxbuster_windows <URL> [threads]"
     exit 1
 fi
 
@@ -105,12 +105,12 @@ feroxbuster --url "$URL" \
 
     FEROS_LINUX_CONTENT='#!/bin/bash
 
-# Script: feroxbuster_linux.sh
-# Description: Runs feroxbuster with Linux-specific flags for directory enumeration.
+# Script: feroxbuster_linux
+# Description: Runs Feroxbuster with Linux-specific flags for directory enumeration.
 
 # Check if at least one argument (URL) is provided
 if [ -z "$1" ]; then
-    echo "Usage: feroxbuster_linux.sh <URL> [threads]"
+    echo "Usage: feroxbuster_linux <URL> [threads]"
     exit 1
 fi
 
@@ -126,45 +126,58 @@ feroxbuster --url "$URL" \
             --dont-scan "vendor,fonts,images,css,assets,docs,js,static,img,help"
 '
 
-    FEROS_SUBDOMAIN_CONTENT='#!/bin/bash
+    # Create feroxbuster_windows
+    echo "Creating feroxbuster_windows..."
+    echo "$FEROS_WINDOWS_CONTENT" | sudo tee "$DJ_SAPER_DIR/feroxbuster_windows" > /dev/null
+    sudo chmod +x "$DJ_SAPER_DIR/feroxbuster_windows"
 
-# Script: feroxbuster_subdomain.sh
-# Description: Runs feroxbuster for subdomain enumeration.
+    # Create feroxbuster_linux
+    echo "Creating feroxbuster_linux..."
+    echo "$FEROS_LINUX_CONTENT" | sudo tee "$DJ_SAPER_DIR/feroxbuster_linux" > /dev/null
+    sudo chmod +x "$DJ_SAPER_DIR/feroxbuster_linux"
+
+    echo "----------------------------------------"
+    echo "Feroxbuster scripts created successfully in $DJ_SAPER_DIR."
+    echo "----------------------------------------"
+}
+
+# Function to install Gobuster scripts
+install_gobuster_scripts() {
+    echo "----------------------------------------"
+    echo "Setting up Gobuster scripts in $DJ_SAPER_DIR..."
+    echo "----------------------------------------"
+
+    # Create the directory if it doesn't exist
+    sudo mkdir -p "$DJ_SAPER_DIR"
+
+    # Define gobuster_subdomains script content with relevant filtering
+    GOBUSTER_SUBDOMAIN_CONTENT='#!/bin/bash
+
+# Script: gobuster_subdomains
+# Description: Runs Gobuster for subdomain enumeration with relevant status code filtering.
 
 # Check if at least one argument (DOMAIN) is provided
 if [ -z "$1" ]; then
-    echo "Usage: feroxbuster_subdomain.sh <DOMAIN> [threads]"
+    echo "Usage: gobuster_subdomains <DOMAIN> [threads]"
     exit 1
 fi
 
 DOMAIN="$1"
 THREADS="${2:-100}"  # Default to 100 threads if not specified
 
-feroxbuster --domain "$DOMAIN" \
-            -r \
-            -t "$THREADS" \
-            -w '"$SUBDOMAIN_WORDLIST"' \
-            --subdomains \
-            --silent
+# Define the status codes to filter (adjust as needed)
+STATUS_CODES="200,204,301,302,307,401,403"
+
+gobuster dns -d "$DOMAIN" -w '"$SUBDOMAIN_WORDLIST"' -t "$THREADS" -s "$STATUS_CODES"
 '
 
-    # Create feroxbuster_windows.sh
-    echo "Creating feroxbuster_windows.sh..."
-    echo "$FEROS_WINDOWS_CONTENT" | sudo tee "$DJ_SAPER_DIR/feroxbuster_windows.sh" > /dev/null
-    sudo chmod +x "$DJ_SAPER_DIR/feroxbuster_windows.sh"
-
-    # Create feroxbuster_linux.sh
-    echo "Creating feroxbuster_linux.sh..."
-    echo "$FEROS_LINUX_CONTENT" | sudo tee "$DJ_SAPER_DIR/feroxbuster_linux.sh" > /dev/null
-    sudo chmod +x "$DJ_SAPER_DIR/feroxbuster_linux.sh"
-
-    # Create feroxbuster_subdomain.sh
-    echo "Creating feroxbuster_subdomain.sh..."
-    echo "$FEROS_SUBDOMAIN_CONTENT" | sudo tee "$DJ_SAPER_DIR/feroxbuster_subdomain.sh" > /dev/null
-    sudo chmod +x "$DJ_SAPER_DIR/feroxbuster_subdomain.sh"
+    # Create gobuster_subdomains
+    echo "Creating gobuster_subdomains..."
+    echo "$GOBUSTER_SUBDOMAIN_CONTENT" | sudo tee "$DJ_SAPER_DIR/gobuster_subdomains" > /dev/null
+    sudo chmod +x "$DJ_SAPER_DIR/gobuster_subdomains"
 
     echo "----------------------------------------"
-    echo "Feroxbuster scripts created successfully in $DJ_SAPER_DIR."
+    echo "Gobuster scripts created successfully in $DJ_SAPER_DIR."
     echo "----------------------------------------"
 }
 
@@ -187,7 +200,7 @@ show_menu() {
     echo "Please select a tool to install:"
     echo "1. BloodHound"
     echo "2. Feroxbuster"
-    echo "3. [Option 3]"
+    echo "3. Gobuster"
     echo "4. [Option 4]"
     echo "A. All of the above"
     echo "----------------------------------------"
@@ -205,7 +218,7 @@ handle_selection() {
             install_feroxbuster_scripts
             ;;
         3)
-            install_option3
+            install_gobuster_scripts
             ;;
         4)
             install_option4
@@ -213,6 +226,7 @@ handle_selection() {
         A|a)
             install_bloodhound
             install_feroxbuster_scripts
+            install_gobuster_scripts
             install_option3
             install_option4
             ;;
@@ -225,18 +239,18 @@ handle_selection() {
     esac
 }
 
-# Function to add /opt/djsaper/ to PATH in zsh
+# Function to add /opt/djasper/ to PATH in zsh
 add_to_path_zsh() {
     echo "----------------------------------------"
-    echo "Adding /opt/djsaper/ to PATH in $ZSHRC..."
+    echo "Adding /opt/djasper/ to PATH in $ZSHRC..."
     echo "----------------------------------------"
 
-    # Check if /opt/djsaper/ is already in PATH
-    if grep -q 'export PATH=.*\/opt/djsaper/' "$ZSHRC"; then
-        echo "/opt/djsaper/ is already in your PATH."
+    # Check if /opt/djasper/ is already in PATH
+    if grep -q 'export PATH=.*\/opt/djasper/' "$ZSHRC"; then
+        echo "/opt/djasper/ is already in your PATH."
     else
-        echo 'export PATH="$PATH:/opt/djsaper/"' | sudo tee -a "$ZSHRC" > /dev/null
-        echo "/opt/djsaper/ added to PATH successfully."
+        echo 'export PATH="$PATH:/opt/djasper/"' | sudo tee -a "$ZSHRC" > /dev/null
+        echo "/opt/djasper/ added to PATH successfully."
     fi
 
     # Reload zsh configuration
@@ -250,16 +264,23 @@ setup_feroxbuster() {
     add_to_path_zsh
 }
 
+# Function to set up Gobuster scripts and update PATH
+setup_gobuster() {
+    install_gobuster_scripts
+    add_to_path_zsh
+}
+
 # Function to create a symbolic link for easy access (Optional)
 create_symlinks() {
     echo "----------------------------------------"
-    echo "Creating symbolic links for Feroxbuster scripts..."
+    echo "Creating symbolic links for scripts (optional)..."
     echo "----------------------------------------"
-    # This step is optional as /opt/djsaper/ is already in PATH
+    # This step is optional as /opt/djasper/ is already in PATH
     # But if desired, you can create symlinks in /usr/local/bin/
     # Example:
-    # sudo ln -s /opt/djsaper/feroxbuster_windows.sh /usr/local/bin/feroxbuster_windows
-    # Repeat for other scripts
+    # sudo ln -s /opt/djasper/feroxbuster_windows /usr/local/bin/feroxbuster_windows
+    # sudo ln -s /opt/djasper/feroxbuster_linux /usr/local/bin/feroxbuster_linux
+    # sudo ln -s /opt/djasper/gobuster_subdomains /usr/local/bin/gobuster_subdomains
     echo "Symbolic links creation is optional and not performed by this script."
     echo "You can manually create symlinks if needed."
 }
@@ -274,18 +295,31 @@ main() {
     show_menu
     handle_selection
 
-    # If Feroxbuster was installed, set up the scripts and update PATH
-    if [[ "$choice" == "2" || "$choice" == "A" || "$choice" == "a" ]]; then
-        setup_feroxbuster
-    fi
+    # Handle additional script setups based on choice
+    case "$choice" in
+        2)
+            echo "Setting up Feroxbuster scripts and updating PATH..."
+            setup_feroxbuster
+            ;;
+        3)
+            echo "Setting up Gobuster scripts and updating PATH..."
+            setup_gobuster
+            ;;
+        A|a)
+            echo "Setting up Feroxbuster scripts and updating PATH..."
+            setup_feroxbuster
+            echo "Setting up Gobuster scripts and updating PATH..."
+            setup_gobuster
+            ;;
+    esac
 
     echo "----------------------------------------"
     echo "Installation process completed."
     echo "----------------------------------------"
-    echo "If you installed Feroxbuster, you can now use the following scripts from anywhere:"
-    echo " - feroxbuster_windows.sh <URL> [threads]"
-    echo " - feroxbuster_linux.sh <URL> [threads]"
-    echo " - feroxbuster_subdomain.sh <DOMAIN> [threads]"
+    echo "You can now use the following scripts from anywhere:"
+    echo " - feroxbuster_windows <URL> [threads]"
+    echo " - feroxbuster_linux <URL> [threads]"
+    echo " - gobuster_subdomains <DOMAIN> [threads]"
     echo "----------------------------------------"
 }
 
