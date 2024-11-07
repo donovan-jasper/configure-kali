@@ -150,11 +150,11 @@ install_gobuster_scripts() {
     # Create the directory if it doesn't exist
     sudo mkdir -p "$DJ_SAPER_DIR"
 
-    # Define gobuster_subdomains script content with relevant filtering
+    # Define gobuster_subdomains script content without status code filtering
     GOBUSTER_SUBDOMAIN_CONTENT='#!/bin/bash
 
 # Script: gobuster_subdomains
-# Description: Runs Gobuster for subdomain enumeration with relevant status code filtering.
+# Description: Runs Gobuster for subdomain enumeration.
 
 # Check if at least one argument (DOMAIN) is provided
 if [ -z "$1" ]; then
@@ -165,10 +165,7 @@ fi
 DOMAIN="$1"
 THREADS="${2:-100}"  # Default to 100 threads if not specified
 
-# Define the status codes to filter (adjust as needed)
-STATUS_CODES="200,204,301,302,307,401,403"
-
-gobuster dns -d "$DOMAIN" -w '"$SUBDOMAIN_WORDLIST"' -t "$THREADS" -s "$STATUS_CODES"
+gobuster dns -d "$DOMAIN" -w '"$SUBDOMAIN_WORDLIST"' -t "$THREADS"
 '
 
     # Create gobuster_subdomains
@@ -181,13 +178,7 @@ gobuster dns -d "$DOMAIN" -w '"$SUBDOMAIN_WORDLIST"' -t "$THREADS" -s "$STATUS_C
     echo "----------------------------------------"
 }
 
-# Placeholder functions for options 3 and 4
-install_option3() {
-    echo "----------------------------------------"
-    echo "Option 3 is not implemented yet."
-    echo "----------------------------------------"
-}
-
+# Placeholder functions for options beyond 4
 install_option4() {
     echo "----------------------------------------"
     echo "Option 4 is not implemented yet."
@@ -197,12 +188,12 @@ install_option4() {
 # Function to display the menu and get user selection
 show_menu() {
     echo "----------------------------------------"
-    echo "Please select a tool to install:"
-    echo "1. BloodHound"
-    echo "2. Feroxbuster"
-    echo "3. Gobuster"
-    echo "4. [Option 4]"
-    echo "A. All of the above"
+    echo "Please select an option to perform:"
+    echo "1. Update and Install Dependencies"
+    echo "2. Install BloodHound"
+    echo "3. Install Feroxbuster"
+    echo "4. Install Gobuster"
+    echo "A. Install All of the Above"
     echo "----------------------------------------"
     echo -n "Enter your choice (1-4 or A): "
     read -r choice
@@ -212,23 +203,21 @@ show_menu() {
 handle_selection() {
     case "$choice" in
         1)
-            install_bloodhound
+            update_and_install_packages
             ;;
         2)
-            install_feroxbuster_scripts
+            install_bloodhound
             ;;
         3)
-            install_gobuster_scripts
+            install_feroxbuster_scripts
             ;;
         4)
-            install_option4
+            install_gobuster_scripts
             ;;
         A|a)
             install_bloodhound
             install_feroxbuster_scripts
             install_gobuster_scripts
-            install_option3
-            install_option4
             ;;
         *)
             echo "----------------------------------------"
@@ -291,21 +280,24 @@ main() {
     echo "Welcome to the Tool Installation Script"
     echo "========================================"
 
-    update_and_install_packages
     show_menu
     handle_selection
 
     # Handle additional script setups based on choice
     case "$choice" in
         2)
+            echo "Setting up BloodHound completed."
+            ;;
+        3)
             echo "Setting up Feroxbuster scripts and updating PATH..."
             setup_feroxbuster
             ;;
-        3)
+        4)
             echo "Setting up Gobuster scripts and updating PATH..."
             setup_gobuster
             ;;
         A|a)
+            echo "Setting up BloodHound completed."
             echo "Setting up Feroxbuster scripts and updating PATH..."
             setup_feroxbuster
             echo "Setting up Gobuster scripts and updating PATH..."
