@@ -6,7 +6,6 @@ set -e
 # Variables
 DJ_SAPER_DIR="/opt/djsaper"
 BLOODHOUND_DIR="/opt/BloodHound"
-ARSENAL_DIR="$DJ_SAPER_DIR/arsenal"
 WORDLIST_DIR="/usr/share/seclists/Discovery"
 DIRECTORY_WORDLIST="$WORDLIST_DIR/Web-Content/directory-list-2.3-medium.txt"
 SUBDOMAIN_WORDLIST="$WORDLIST_DIR/DNS/subdomains-top1million-110000.txt"
@@ -19,7 +18,7 @@ update_and_install_packages() {
     echo "Updating package list and installing dependencies..."
     echo "----------------------------------------"
     sudo apt update -y
-    sudo apt install -y docker-compose git feroxbuster seclists python3-pip
+    sudo apt install -y docker-compose git gobuster feroxbuster seclists python3-pip
     echo "----------------------------------------"
     echo "Package installation completed."
     echo "----------------------------------------"
@@ -74,52 +73,6 @@ install_or_update_bloodhound() {
     cd -
 }
 
-# Function to install or update Arsenal
-install_or_update_arsenal() {
-    echo "----------------------------------------"
-    echo "Starting installation/update of Arsenal..."
-    echo "----------------------------------------"
-
-    if [ ! -d "$ARSENAL_DIR" ]; then
-        echo "Cloning Arsenal repository to $ARSENAL_DIR..."
-        sudo git clone https://github.com/Orange-Cyberdefense/arsenal.git "$ARSENAL_DIR"
-    else
-        echo "Arsenal directory exists. Pulling latest changes..."
-        cd "$ARSENAL_DIR"
-        sudo git pull
-        cd -
-    fi
-
-    # Change ownership to the non-root user
-    echo "Changing ownership of $ARSENAL_DIR to $USER_NAME..."
-    sudo chown -R "$USER_NAME":"$USER_NAME" "$ARSENAL_DIR"
-
-    # Create a Python virtual environment as the non-root user
-    echo "Creating virtual environment for Arsenal..."
-    sudo -u "$USER_NAME" bash -c "cd '$ARSENAL_DIR' && python3 -m venv venv"
-
-    # Install Python dependencies within the virtual environment
-    echo "Installing Python dependencies for Arsenal..."
-    sudo -u "$USER_NAME" bash -c "source '$ARSENAL_DIR/venv/bin/activate' && pip install --upgrade pip && pip install -r '$ARSENAL_DIR/requirements.txt'"
-
-    # Add alias to .zshrc if not already present
-    echo "Adding alias 'a' for 'arsenal' to $ZSHRC..."
-    if sudo -u "$USER_NAME" grep -q "alias a='python3 $ARSENAL_DIR/venv/bin/python $ARSENAL_DIR/run'" "$ZSHRC"; then
-        echo "Alias 'a' for 'arsenal' already exists in $ZSHRC."
-    else
-        echo "alias a='python3 $ARSENAL_DIR/venv/bin/python $ARSENAL_DIR/run'" | sudo tee -a "$ZSHRC" > /dev/null
-        echo "Alias added successfully."
-    fi
-
-    # Reload zsh configuration
-    echo "Reloading zsh configuration..."
-    sudo -u "$USER_NAME" bash -c "source '$ZSHRC'"
-
-    echo "----------------------------------------"
-    echo "Arsenal has been installed/updated and is accessible via the 'a' alias."
-    echo "----------------------------------------"
-}
-
 # Function to install Feroxbuster scripts
 install_feroxbuster_scripts() {
     echo "----------------------------------------"
@@ -164,27 +117,27 @@ EOL
 
     # Define script contents without quotes for variables
     DIR_WINDOWS_CMD='feroxbuster --url "$INPUT" \
-            -r \
-            -t "$THREADS" \
-            -w '"$DIRECTORY_WORDLIST"' \
-            -C 404,403,400,503,500,501,502 \
-            -x exe,bat,msi,cmd,ps1 \
-            --dont-scan "vendor,fonts,images,css,assets,docs,js,static,img,help"'
+    -r \
+    -t "$THREADS" \
+    -w '"$DIRECTORY_WORDLIST"' \
+    -C 404,403,400,503,500,501,502 \
+    -x exe,bat,msi,cmd,ps1 \
+    --dont-scan "vendor,fonts,images,css,assets,docs,js,static,img,help"'
 
     DIR_LINUX_CMD='feroxbuster --url "$INPUT" \
-            -r \
-            -t "$THREADS" \
-            -w '"$DIRECTORY_WORDLIST"' \
-            -C 404,403,400,503,500,501,502 \
-            -x txt,sh,zip,bak,py,php \
-            --dont-scan "vendor,fonts,images,css,assets,docs,js,static,img,help"'
+    -r \
+    -t "$THREADS" \
+    -w '"$DIRECTORY_WORDLIST"' \
+    -C 404,403,400,503,500,501,502 \
+    -x txt,sh,zip,bak,py,php \
+    --dont-scan "vendor,fonts,images,css,assets,docs,js,static,img,help"'
 
     SUBDOMAIN_CMD='feroxbuster --domain "$INPUT" \
-            -r \
-            -t "$THREADS" \
-            -w '"$SUBDOMAIN_WORDLIST"' \
-            --subdomains \
-            --silent'
+    -r \
+    -t "$THREADS" \
+    -w '"$SUBDOMAIN_WORDLIST"' \
+    --subdomains \
+    --silent'
 
     # Create feroxbuster_windows.sh
     create_script "feroxbuster_windows.sh" "Runs feroxbuster with Windows-specific flags for directory enumeration." "$DIR_WINDOWS_CMD"
@@ -211,6 +164,77 @@ EOL
     fi
 }
 
+# Function to install Gobuster scripts
+install_gobuster_scripts() {
+    echo "----------------------------------------"
+    echo "Setting up Gobuster scripts in $DJ_SAPER_DIR..."
+    echo "----------------------------------------"
+
+    # Ensure Gobuster is installed
+    if ! command -v gobuster &> /dev/null; then
+        echo "Gobuster is not installed. Installing..."
+        sudo apt install -y gobuster
+    else
+        echo "Gobuster is already installed."
+    fi
+
+    # Function to create a script using here-doc
+    create_script() {
+        local script_name="$1"
+        local script_description="$2"
+        local script_content="$3"
+        local script_path="$DJ_SAPER_DIR/$script_name"
+
+        if [ -f "$script_path" ]; then
+            echo "$script_name already exists. Skipping creation."
+        else
+            echo "Creating $script_name..."
+            sudo tee "$script_path" > /dev/null <<EOL
+#!/bin/bash
+
+# Script: $script_name
+# Description: $script_description
+
+# Check if at least one argument (DOMAIN) is provided
+if [ -z "\$1" ]; then
+    echo "Usage: $script_name <DOMAIN> [threads]"
+    exit 1
+fi
+
+DOMAIN="\$1"
+THREADS="\${2:-100}"  # Default to 100 threads if not specified
+
+$script_content
+EOL
+            sudo chmod +x "$script_path"
+            echo "$script_name created and made executable."
+        fi
+    }
+
+    # Define script contents without quotes for variables
+    DNS_ENUM_CMD='gobuster dns -d "$DOMAIN" \
+    -t "$THREADS" \
+    -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-110000.txt \
+    -o "$DJ_SAPER_DIR/gobuster_dns_output.txt"'
+
+    VHOST_ENUM_CMD='gobuster vhost -u http://"$DOMAIN" \
+    -t "$THREADS" \
+    -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-110000.txt \
+    -o "$DJ_SAPER_DIR/gobuster_vhost_output.txt"'
+
+    # Create gobuster_dns.sh
+    create_script "gobuster_dns.sh" "Runs Gobuster for DNS subdomain enumeration." "$DNS_ENUM_CMD"
+
+    # Create gobuster_vhost.sh
+    create_script "gobuster_vhost.sh" "Runs Gobuster for Virtual Host enumeration." "$VHOST_ENUM_CMD"
+
+    echo "----------------------------------------"
+    echo "Gobuster scripts set up successfully in $DJ_SAPER_DIR."
+    echo "----------------------------------------"
+
+    # Add /opt/djsaper/ to PATH in zsh if not already present (already handled in Feroxbuster section)
+}
+
 # Function to update installed tools
 update_tools() {
     echo "----------------------------------------"
@@ -225,11 +249,13 @@ update_tools() {
         echo "BloodHound is not installed. Skipping update."
     fi
 
-    # Update Arsenal
-    if [ -d "$ARSENAL_DIR" ]; then
-        install_or_update_arsenal
+    # Update Feroxbuster scripts
+    if [ -d "$DJ_SAPER_DIR" ]; then
+        echo "Updating Feroxbuster scripts..."
+        install_feroxbuster_scripts
+        install_gobuster_scripts
     else
-        echo "Arsenal is not installed. Skipping update."
+        echo "Feroxbuster scripts are not installed. Skipping update."
     fi
 
     echo "----------------------------------------"
@@ -244,7 +270,7 @@ show_menu() {
     echo "1. Update Installed Tools"
     echo "2. Install BloodHound"
     echo "3. Install Feroxbuster"
-    echo "4. Install Arsenal"
+    echo "4. Install Gobuster"
     echo "A. Install All of the Above"
     echo "----------------------------------------"
     echo -n "Enter your choice (1-4 or A): "
@@ -263,16 +289,17 @@ handle_selection() {
             ;;
         3)
             install_feroxbuster_scripts
+            install_gobuster_scripts
             ;;
         4)
-            install_or_update_arsenal
+            install_gobuster_scripts
             ;;
         A|a)
             echo "Installing all tools..."
             update_and_install_packages
             install_or_update_bloodhound
             install_feroxbuster_scripts
-            install_or_update_arsenal
+            install_gobuster_scripts
             echo "----------------------------------------"
             echo "All tools have been installed/updated successfully."
             echo "----------------------------------------"
@@ -303,8 +330,11 @@ main() {
     echo " - feroxbuster_linux.sh <URL> [threads]"
     echo " - feroxbuster_subdomain.sh <DOMAIN> [threads]"
     echo "----------------------------------------"
-    echo "If you installed Arsenal, you can launch it using the 'a' alias:"
-    echo " - a"
+    echo "If you installed Gobuster, you can now use the following scripts from anywhere:"
+    echo " - gobuster_dns.sh <DOMAIN> [threads]"
+    echo " - gobuster_vhost.sh <DOMAIN> [threads]"
+    echo "----------------------------------------"
+    echo "To use Feroxbuster and Gobuster scripts without specifying the full path, ensure /opt/djsaper/ is in your PATH."
     echo "----------------------------------------"
 }
 
