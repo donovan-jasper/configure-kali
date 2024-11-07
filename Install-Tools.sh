@@ -8,6 +8,7 @@ DJ_SAPER_DIR="/opt/djasper"
 WORDLIST_DIR="/usr/share/seclists/Discovery"
 DIRECTORY_WORDLIST="$WORDLIST_DIR/Web-Content/directory-list-2.3-medium.txt"
 SUBDOMAIN_WORDLIST="$WORDLIST_DIR/DNS/subdomains-top1million-110000.txt"
+VHOST_WORDLIST="$WORDLIST_DIR/Discovery/Web-Content/best-vhosts.txt"  # Example wordlist for vhost
 ZSHRC="$HOME/.zshrc"
 
 # Function to update package list and install necessary packages
@@ -16,7 +17,7 @@ update_and_install_packages() {
     echo "Updating package list and installing dependencies..."
     echo "----------------------------------------"
     sudo apt update -y
-    sudo apt install -y docker-compose git feroxbuster gobuster seclists
+    sudo apt install -y docker-compose git feroxbuster gobuster seclists xclip
     echo "----------------------------------------"
     echo "Package installation completed."
     echo "----------------------------------------"
@@ -150,28 +151,81 @@ install_gobuster_scripts() {
     # Create the directory if it doesn't exist
     sudo mkdir -p "$DJ_SAPER_DIR"
 
-    # Define gobuster_subdomains script content without status code filtering
-    GOBUSTER_SUBDOMAIN_CONTENT='#!/bin/bash
+    # Define gobuster_dns script content with optional -r flag
+    GOBUSTER_DNS_CONTENT='#!/bin/bash
 
-# Script: gobuster_subdomains
-# Description: Runs Gobuster for subdomain enumeration.
+# Script: gobuster_dns
+# Description: Runs Gobuster for DNS subdomain enumeration with optional recursion.
 
 # Check if at least one argument (DOMAIN) is provided
 if [ -z "$1" ]; then
-    echo "Usage: gobuster_subdomains <DOMAIN> [threads]"
+    echo "Usage: gobuster_dns <DOMAIN> [threads] [--recursive]"
     exit 1
 fi
 
 DOMAIN="$1"
 THREADS="${2:-100}"  # Default to 100 threads if not specified
+RECURSIVE=false
 
-gobuster dns -d "$DOMAIN" -w '"$SUBDOMAIN_WORDLIST"' -t "$THREADS"
+# Check for --recursive flag
+if [[ "$3" == "--recursive" ]]; then
+    RECURSIVE=true
+fi
+
+# Construct Gobuster command
+CMD="gobuster dns -d \"$DOMAIN\" -w \"$SUBDOMAIN_WORDLIST\" -t \"$THREADS\""
+
+if [ "$RECURSIVE" = true ]; then
+    CMD+=" -r"
+fi
+
+# Execute Gobuster
+eval $CMD
 '
 
-    # Create gobuster_subdomains
-    echo "Creating gobuster_subdomains..."
-    echo "$GOBUSTER_SUBDOMAIN_CONTENT" | sudo tee "$DJ_SAPER_DIR/gobuster_subdomains" > /dev/null
-    sudo chmod +x "$DJ_SAPER_DIR/gobuster_subdomains"
+    # Define gobuster_vhost script content
+    GOBUSTER_VHOST_CONTENT='#!/bin/bash
+
+# Script: gobuster_vhost
+# Description: Runs Gobuster for Virtual Host enumeration.
+
+# Check if at least one argument (URL) is provided
+if [ -z "$1" ]; then
+    echo "Usage: gobuster_vhost <URL> [threads]"
+    exit 1
+fi
+
+URL="$1"
+THREADS="${2:-100}"  # Default to 100 threads if not specified
+
+# Ensure the URL starts with http:// or https://
+if [[ "$URL" != http://* && "$URL" != https://* ]]; then
+    echo "Error: URL must start with http:// or https://"
+    exit 1
+fi
+
+# Example wordlist for vhost enumeration (ensure this exists or adjust the path)
+VHOST_WORDLIST="$WORDLIST_DIR/Web-Content/best-vhosts.txt"
+
+# Check if the VHOST_WORDLIST exists
+if [ ! -f "$VHOST_WORDLIST" ]; then
+    echo "Error: VHOST wordlist not found at $VHOST_WORDLIST"
+    exit 1
+fi
+
+# Run Gobuster for virtual hosts
+gobuster vhost -u "$URL" -w "$VHOST_WORDLIST" -t "$THREADS"
+'
+
+    # Create gobuster_dns
+    echo "Creating gobuster_dns..."
+    echo "$GOBUSTER_DNS_CONTENT" | sudo tee "$DJ_SAPER_DIR/gobuster_dns" > /dev/null
+    sudo chmod +x "$DJ_SAPER_DIR/gobuster_dns"
+
+    # Create gobuster_vhost
+    echo "Creating gobuster_vhost..."
+    echo "$GOBUSTER_VHOST_CONTENT" | sudo tee "$DJ_SAPER_DIR/gobuster_vhost" > /dev/null
+    sudo chmod +x "$DJ_SAPER_DIR/gobuster_vhost"
 
     echo "----------------------------------------"
     echo "Gobuster scripts created successfully in $DJ_SAPER_DIR."
@@ -179,9 +233,9 @@ gobuster dns -d "$DOMAIN" -w '"$SUBDOMAIN_WORDLIST"' -t "$THREADS"
 }
 
 # Placeholder functions for options beyond 4
-install_option4() {
+install_option5() {
     echo "----------------------------------------"
-    echo "Option 4 is not implemented yet."
+    echo "Option 5 is not implemented yet."
     echo "----------------------------------------"
 }
 
@@ -238,13 +292,15 @@ add_to_path_zsh() {
     if grep -q 'export PATH=.*\/opt/djasper/' "$ZSHRC"; then
         echo "/opt/djasper/ is already in your PATH."
     else
+        # Append the export PATH line to .zshrc
         echo 'export PATH="$PATH:/opt/djasper/"' | sudo tee -a "$ZSHRC" > /dev/null
         echo "/opt/djasper/ added to PATH successfully."
-    fi
 
-    # Reload zsh configuration
-    echo "Reloading zsh configuration..."
-    source "$ZSHRC"
+        # Copy the export PATH line to clipboard
+        echo 'export PATH="$PATH:/opt/djasper/"' | xclip -selection clipboard
+        echo "The PATH update command has been copied to your clipboard."
+        echo "Please paste it into your terminal or restart your terminal session to apply the changes."
+    fi
 }
 
 # Function to set up Feroxbuster scripts and update PATH
@@ -269,7 +325,8 @@ create_symlinks() {
     # Example:
     # sudo ln -s /opt/djasper/feroxbuster_windows /usr/local/bin/feroxbuster_windows
     # sudo ln -s /opt/djasper/feroxbuster_linux /usr/local/bin/feroxbuster_linux
-    # sudo ln -s /opt/djasper/gobuster_subdomains /usr/local/bin/gobuster_subdomains
+    # sudo ln -s /opt/djasper/gobuster_dns /usr/local/bin/gobuster_dns
+    # sudo ln -s /opt/djasper/gobuster_vhost /usr/local/bin/gobuster_vhost
     echo "Symbolic links creation is optional and not performed by this script."
     echo "You can manually create symlinks if needed."
 }
@@ -286,7 +343,7 @@ main() {
     # Handle additional script setups based on choice
     case "$choice" in
         2)
-            echo "Setting up BloodHound completed."
+            echo "BloodHound setup completed."
             ;;
         3)
             echo "Setting up Feroxbuster scripts and updating PATH..."
@@ -297,7 +354,7 @@ main() {
             setup_gobuster
             ;;
         A|a)
-            echo "Setting up BloodHound completed."
+            echo "BloodHound setup completed."
             echo "Setting up Feroxbuster scripts and updating PATH..."
             setup_feroxbuster
             echo "Setting up Gobuster scripts and updating PATH..."
@@ -311,8 +368,10 @@ main() {
     echo "You can now use the following scripts from anywhere:"
     echo " - feroxbuster_windows <URL> [threads]"
     echo " - feroxbuster_linux <URL> [threads]"
-    echo " - gobuster_subdomains <DOMAIN> [threads]"
+    echo " - gobuster_dns <DOMAIN> [threads] [--recursive]"
+    echo " - gobuster_vhost <URL> [threads]"
     echo "----------------------------------------"
+    echo "Remember to paste the PATH update command from your clipboard into your terminal or restart your terminal session."
 }
 
 # Run the main function
