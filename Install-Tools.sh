@@ -5,6 +5,8 @@ set -e
 
 # Variables
 DJ_SAPER_DIR="/opt/djsaper"
+BLOODHOUND_DIR="/opt/BloodHound"
+ARSENAL_DIR="$DJ_SAPER_DIR/arsenal"
 WORDLIST_DIR="/usr/share/seclists/Discovery"
 DIRECTORY_WORDLIST="$WORDLIST_DIR/Web-Content/directory-list-2.3-medium.txt"
 SUBDOMAIN_WORDLIST="$WORDLIST_DIR/DNS/subdomains-top1million-110000.txt"
@@ -22,24 +24,25 @@ update_and_install_packages() {
     echo "----------------------------------------"
 }
 
-# Function to install BloodHound
-install_bloodhound() {
+# Function to install or update BloodHound
+install_or_update_bloodhound() {
     echo "----------------------------------------"
-    echo "Starting installation of BloodHound..."
+    echo "Starting installation/update of BloodHound..."
     echo "----------------------------------------"
 
-    # Clone the BloodHound repository if it doesn't exist
-    if [ ! -d "/opt/BloodHound" ]; then
-        echo "Cloning BloodHound repository to /opt/BloodHound..."
-        sudo git clone https://github.com/SpecterOps/BloodHound.git /opt/BloodHound
+    if [ ! -d "$BLOODHOUND_DIR" ]; then
+        echo "Cloning BloodHound repository to $BLOODHOUND_DIR..."
+        sudo git clone https://github.com/SpecterOps/BloodHound.git "$BLOODHOUND_DIR"
     else
-        echo "/opt/BloodHound already exists. Skipping clone."
+        echo "BloodHound directory exists. Pulling latest changes..."
+        cd "$BLOODHOUND_DIR"
+        sudo git pull
     fi
 
     # Navigate to the BloodHound directory
-    cd /opt/BloodHound/
+    cd "$BLOODHOUND_DIR"
 
-    # Copy Docker Compose example files
+    # Copy Docker Compose example files if they don't exist
     echo "Setting up Docker Compose files..."
     sudo cp -n examples/docker-compose/* ./  # Use -n to avoid overwriting existing files
     echo "Docker Compose files set up successfully."
@@ -61,13 +64,60 @@ install_bloodhound() {
         echo "Failed to retrieve the BloodHound initial password. Please check the Docker Compose logs manually."
     else
         echo "----------------------------------------"
-        echo "BloodHound has been installed successfully."
+        echo "BloodHound has been installed/updated successfully."
         echo "BloodHound Initial Password: $PASSWORD"
         echo "----------------------------------------"
     fi
 
     # Navigate back to the original directory
     cd -
+}
+
+# Function to install or update Arsenal
+install_or_update_arsenal() {
+    echo "----------------------------------------"
+    echo "Starting installation/update of Arsenal..."
+    echo "----------------------------------------"
+
+    if [ ! -d "$ARSENAL_DIR" ]; then
+        echo "Cloning Arsenal repository to $ARSENAL_DIR..."
+        sudo git clone https://github.com/Orange-Cyberdefense/arsenal.git "$ARSENAL_DIR"
+    else
+        echo "Arsenal directory exists. Pulling latest changes..."
+        cd "$ARSENAL_DIR"
+        sudo git pull
+    fi
+
+    # Navigate to the Arsenal directory
+    cd "$ARSENAL_DIR"
+
+    # Install Python dependencies
+    echo "Installing Python dependencies for Arsenal..."
+    sudo python3 -m pip install -r requirements.txt
+    echo "Python dependencies installed successfully."
+
+    # Optional: Ensure 'arsenal' is installed via pip if required
+    # sudo python3 -m pip install .
+
+    # Navigate back to the original directory
+    cd -
+
+    # Add alias to .zshrc if not already present
+    if grep -q "alias a='arsenal'" "$ZSHRC"; then
+        echo "Alias 'a' for 'arsenal' already exists in $ZSHRC."
+    else
+        echo "Adding alias 'a' for 'arsenal' to $ZSHRC..."
+        echo "alias a='python3 $ARSENAL_DIR/run'" | sudo tee -a "$ZSHRC" > /dev/null
+        echo "Alias added successfully."
+    fi
+
+    # Reload zsh configuration
+    echo "Reloading zsh configuration..."
+    source "$ZSHRC"
+
+    echo "----------------------------------------"
+    echo "Arsenal has been installed/updated and is accessible via the 'a' alias."
+    echo "----------------------------------------"
 }
 
 # Function to install Feroxbuster scripts
@@ -148,43 +198,95 @@ feroxbuster --domain "$DOMAIN" \
             --silent
 '
 
+    # Function to create a script if it doesn't exist
+    create_script() {
+        local script_name="$1"
+        local script_content="$2"
+
+        if [ -f "$DJ_SAPER_DIR/$script_name" ]; then
+            echo "$script_name already exists. Skipping creation."
+        else
+            echo "Creating $script_name..."
+            echo "$script_content" | sudo tee "$DJ_SAPER_DIR/$script_name" > /dev/null
+            sudo chmod +x "$DJ_SAPER_DIR/$script_name"
+            echo "$script_name created and made executable."
+        fi
+    }
+
     # Create feroxbuster_windows.sh
-    echo "Creating feroxbuster_windows.sh..."
-    echo "$FEROS_WINDOWS_CONTENT" | sudo tee "$DJ_SAPER_DIR/feroxbuster_windows.sh" > /dev/null
-    sudo chmod +x "$DJ_SAPER_DIR/feroxbuster_windows.sh"
+    create_script "feroxbuster_windows.sh" "$FEROS_WINDOWS_CONTENT"
 
     # Create feroxbuster_linux.sh
-    echo "Creating feroxbuster_linux.sh..."
-    echo "$FEROS_LINUX_CONTENT" | sudo tee "$DJ_SAPER_DIR/feroxbuster_linux.sh" > /dev/null
-    sudo chmod +x "$DJ_SAPER_DIR/feroxbuster_linux.sh"
+    create_script "feroxbuster_linux.sh" "$FEROS_LINUX_CONTENT"
 
     # Create feroxbuster_subdomain.sh
-    echo "Creating feroxbuster_subdomain.sh..."
-    echo "$FEROS_SUBDOMAIN_CONTENT" | sudo tee "$DJ_SAPER_DIR/feroxbuster_subdomain.sh" > /dev/null
-    sudo chmod +x "$DJ_SAPER_DIR/feroxbuster_subdomain.sh"
+    create_script "feroxbuster_subdomain.sh" "$FEROS_SUBDOMAIN_CONTENT"
 
     echo "----------------------------------------"
-    echo "Feroxbuster scripts created successfully in $DJ_SAPER_DIR."
+    echo "Feroxbuster scripts set up successfully in $DJ_SAPER_DIR."
     echo "----------------------------------------"
 }
 
-# Function to install Arsenal
+# Function to update installed tools
+update_tools() {
+    echo "----------------------------------------"
+    echo "Updating installed tools..."
+    echo "----------------------------------------"
+    update_and_install_packages
+
+    # Update BloodHound
+    if [ -d "$BLOODHOUND_DIR" ]; then
+        install_or_update_bloodhound
+    else
+        echo "BloodHound is not installed. Skipping update."
+    fi
+
+    # Update Feroxbuster scripts
+    if [ -d "$DJ_SAPER_DIR" ]; then
+        echo "Feroxbuster scripts already exist. No update needed."
+    else
+        echo "Feroxbuster scripts are not installed. Skipping update."
+    fi
+
+    # Update Arsenal
+    if [ -d "$ARSENAL_DIR" ]; then
+        install_or_update_arsenal
+    else
+        echo "Arsenal is not installed. Skipping update."
+    fi
+
+    echo "----------------------------------------"
+    echo "Update process completed."
+    echo "----------------------------------------"
+}
+
+# Function to install Arsenal via git clone
 install_arsenal() {
     echo "----------------------------------------"
     echo "Starting installation of Arsenal..."
     echo "----------------------------------------"
 
-    # Install Arsenal via pip
-    echo "Installing Arsenal using pip..."
-    sudo python3 -m pip install arsenal-cli
-    echo "Arsenal installed successfully."
+    if [ ! -d "$ARSENAL_DIR" ]; then
+        echo "Cloning Arsenal repository to $ARSENAL_DIR..."
+        sudo git clone https://github.com/Orange-Cyberdefense/arsenal.git "$ARSENAL_DIR"
+    else
+        echo "Arsenal directory already exists. Skipping clone."
+    fi
+
+    # Navigate to the Arsenal directory
+    cd "$ARSENAL_DIR"
+
+    # Install Python dependencies
+    echo "Installing Python dependencies for Arsenal..."
+    sudo python3 -m pip install -r requirements.txt
+    echo "Python dependencies installed successfully."
 
     # Add alias to .zshrc if not already present
-    if grep -q "alias a='arsenal'" "$ZSHRC"; then
+    if grep -q "alias a='python3 $ARSENAL_DIR/run'" "$ZSHRC"; then
         echo "Alias 'a' for 'arsenal' already exists in $ZSHRC."
     else
         echo "Adding alias 'a' for 'arsenal' to $ZSHRC..."
-        echo "alias a='arsenal'" | sudo tee -a "$ZSHRC" > /dev/null
+        echo "alias a='python3 $ARSENAL_DIR/run'" | sudo tee -a "$ZSHRC" > /dev/null
         echo "Alias added successfully."
     fi
 
@@ -197,28 +299,18 @@ install_arsenal() {
     echo "----------------------------------------"
 }
 
-# Placeholder functions for options 4 (Future Implementations)
-install_option3() {
-    echo "----------------------------------------"
-    echo "Option 3 is not implemented yet."
-    echo "----------------------------------------"
-}
-
-install_option4() {
-    echo "----------------------------------------"
-    echo "Option 4 is not implemented yet."
-    echo "----------------------------------------"
-}
+# Function to install Feroxbuster scripts
+# (This function is already defined above as install_feroxbuster_scripts)
 
 # Function to display the menu and get user selection
 show_menu() {
     echo "----------------------------------------"
-    echo "Please select a tool to install:"
-    echo "1. BloodHound"
-    echo "2. Feroxbuster"
-    echo "3. Arsenal"
-    echo "4. [Option 4]"
-    echo "A. All of the above"
+    echo "Please select an option:"
+    echo "1. Update Installed Tools"
+    echo "2. Install BloodHound"
+    echo "3. Install Feroxbuster"
+    echo "4. Install Arsenal"
+    echo "A. Install All of the Above"
     echo "----------------------------------------"
     echo -n "Enter your choice (1-4 or A): "
     read -r choice
@@ -228,104 +320,14 @@ show_menu() {
 handle_selection() {
     case "$choice" in
         1)
-            install_bloodhound
+            update_tools
             ;;
         2)
-            install_feroxbuster_scripts
+            install_or_update_bloodhound
             ;;
         3)
-            install_arsenal
+            install_feroxbuster_scripts
             ;;
         4)
-            install_option4
-            ;;
-        A|a)
-            install_bloodhound
-            install_feroxbuster_scripts
             install_arsenal
-            install_option4
-            ;;
-        *)
-            echo "----------------------------------------"
-            echo "Invalid selection. Please run the script again and choose a valid option."
-            echo "----------------------------------------"
-            exit 1
-            ;;
-    esac
-}
-
-# Function to add /opt/djsaper/ to PATH in zsh
-add_to_path_zsh() {
-    echo "----------------------------------------"
-    echo "Adding /opt/djsaper/ to PATH in $ZSHRC..."
-    echo "----------------------------------------"
-
-    # Check if /opt/djsaper/ is already in PATH
-    if grep -q 'export PATH=.*\/opt/djsaper/' "$ZSHRC"; then
-        echo "/opt/djsaper/ is already in your PATH."
-    else
-        echo 'export PATH="$PATH:/opt/djsaper/"' | sudo tee -a "$ZSHRC" > /dev/null
-        echo "/opt/djsaper/ added to PATH successfully."
-    fi
-
-    # Reload zsh configuration
-    echo "Reloading zsh configuration..."
-    source "$ZSHRC"
-}
-
-# Function to set up Feroxbuster scripts and update PATH
-setup_feroxbuster() {
-    install_feroxbuster_scripts
-    add_to_path_zsh
-}
-
-# Function to create symbolic links for easier access (Optional)
-create_symlinks() {
-    echo "----------------------------------------"
-    echo "Creating symbolic links for Feroxbuster scripts..."
-    echo "----------------------------------------"
-    # This step is optional as /opt/djsaper/ is already in PATH
-    # Uncomment the lines below if you prefer creating symlinks in /usr/local/bin/
-    # sudo ln -s /opt/djsaper/feroxbuster_windows.sh /usr/local/bin/feroxbuster_windows
-    # sudo ln -s /opt/djsaper/feroxbuster_linux.sh /usr/local/bin/feroxbuster_linux
-    # sudo ln -s /opt/djsaper/feroxbuster_subdomain.sh /usr/local/bin/feroxbuster_subdomain
-    echo "Symbolic links creation is optional and not performed by this script."
-    echo "You can manually create symlinks if needed."
-}
-
-# Main script execution
-main() {
-    echo "========================================"
-    echo "Welcome to the Tool Installation Script"
-    echo "========================================"
-
-    update_and_install_packages
-    show_menu
-    handle_selection
-
-    # If Feroxbuster was installed, set up the scripts and update PATH
-    if [[ "$choice" == "2" || "$choice" == "A" || "$choice" == "a" ]]; then
-        setup_feroxbuster
-    fi
-
-    # If Arsenal was installed, ensure the alias is set
-    if [[ "$choice" == "3" || "$choice" == "A" || "$choice" == "a" ]]; then
-        echo "----------------------------------------"
-        echo "You can now use the 'a' alias to launch Arsenal."
-        echo "For example:"
-        echo "    a"
-        echo "----------------------------------------"
-    fi
-
-    echo "----------------------------------------"
-    echo "Installation process completed."
-    echo "----------------------------------------"
-    echo "If you installed Feroxbuster, you can now use the following scripts from anywhere:"
-    echo " - feroxbuster_windows.sh <URL> [threads]"
-    echo " - feroxbuster_linux.sh <URL> [threads]"
-    echo " - feroxbuster_subdomain.sh <DOMAIN> [threads]"
-    echo "----------------------------------------"
-}
-
-# Run the main function
-main
+          
