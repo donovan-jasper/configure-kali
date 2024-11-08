@@ -61,5 +61,40 @@ fi
 # Add zsh-syntax-highlighting to the end of .zshrc
 echo "source $HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" >> $HOME/.zshrc
 
+# Ensure the logs directory exists
+echo "Ensuring ~/logs directory exists..."
+mkdir -p ~/logs
+
+# Define the script to be run on shell startup
+# Replace 'your_script.sh' with the actual script you want to run
+STARTUP_SCRIPT_PATH="$HOME/your_script.sh"
+
+# Ensure the startup script exists and is executable
+if [ ! -f "$STARTUP_SCRIPT_PATH" ]; then
+    echo "Startup script not found at $STARTUP_SCRIPT_PATH. Please create it or update the path."
+else
+    chmod +x "$STARTUP_SCRIPT_PATH"
+fi
+
+# Add function to .zshrc to run the startup script and log output
+echo "Adding startup script execution to .zshrc..."
+
+cat << 'EOF' >> $HOME/.zshrc
+
+# Function to run a startup script and log its output
+run_startup_script() {
+    local log_dir="$HOME/logs"
+    mkdir -p "$log_dir"
+    local timestamp=$(date +%Y%m%d_%H%M%S)
+    local log_file="$log_dir/log-$timestamp.log"
+    
+    # Replace the path below with the path to your actual script
+    "$HOME/your_script.sh" > "$log_file" 2>&1
+}
+
+# Execute the startup script function
+run_startup_script
+EOF
+
 # Start a new Zsh shell
 exec zsh
