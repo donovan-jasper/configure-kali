@@ -65,31 +65,39 @@ echo "source $HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" >> $HOME
 echo "Ensuring ~/logs directory exists..."
 mkdir -p ~/logs
 
-# Define the script to be run on shell startup
-# Replace 'your_script.sh' with the actual script you want to run
-STARTUP_SCRIPT_PATH="$HOME/your_script.sh"
-
-# Ensure the startup script exists and is executable
-if [ ! -f "$STARTUP_SCRIPT_PATH" ]; then
-    echo "Startup script not found at $STARTUP_SCRIPT_PATH. Please create it or update the path."
+# Ensure the 'script' utility is installed
+if ! command -v script &> /dev/null
+then
+    echo "'script' command not found. Installing util-linux package..."
+    sudo apt-get update && sudo apt-get install util-linux -y
 else
-    chmod +x "$STARTUP_SCRIPT_PATH"
+    echo "'script' command is already installed."
 fi
 
-# Add function to .zshrc to run the startup script and log output
-echo "Adding startup script execution to .zshrc..."
+# Add function to .zshrc to run the 'script' command and log output
+echo "Adding terminal session logging to .zshrc..."
 
 cat << 'EOF' >> $HOME/.zshrc
 
-# Function to run a startup script and log its output
+# Function to run the 'script' command and log the terminal session
 run_startup_script() {
-    local log_dir="$HOME/logs"
-    mkdir -p "$log_dir"
-    local timestamp=$(date +%Y%m%d_%H%M%S)
-    local log_file="$log_dir/log-$timestamp.log"
-    
-    # Replace the path below with the path to your actual script
-    "$HOME/your_script.sh" > "$log_file" 2>&1
+    # Prevent recursion by checking if the script is already running
+    if [ -z "$SCRIPT_SESSION" ]; then
+        export SCRIPT_SESSION=true
+
+        local log_dir="$HOME/logs"
+        mkdir -p "$log_dir"
+        local timestamp=$(date +%Y%m%d_%H%M%S)
+        local log_file="$log_dir/log-$timestamp.log"
+
+        echo "Starting terminal session logging to $log_file"
+
+        # Start logging the terminal session using 'script'
+        # The '-q' flag runs 'script' in quiet mode
+        # The '-f' flag flushes output after each write
+        # The '-c' flag specifies the command to run (zsh in this case)
+        script -q -f "$log_file" -c zsh
+    fi
 }
 
 # Execute the startup script function
