@@ -61,5 +61,59 @@ fi
 # Add zsh-syntax-highlighting to the end of .zshrc
 echo "source $HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" >> $HOME/.zshrc
 
+
+# Add function to .zshrc to run the 'script' command and log output
+echo "Adding terminal session logging to .zshrc..."
+
+cat << 'EOF' >> $HOME/.zshrc
+
+# Function to log terminal sessions without blocking
+terminal_logger() {
+    # Only start logging if we're in an interactive shell and not already logging
+    if [[ -o interactive ]] && [[ -z "$TERMINAL_LOGGING" ]]; then
+        # Set up logging directory
+        local log_dir="${HOME}/logs"
+        mkdir -p "$log_dir"
+
+        # Generate timestamp and filename
+        local timestamp=$(date +%Y%m%d_%H%M%S)
+        local hostname=$(hostname)
+        local log_file="${log_dir}/terminal_${hostname}_${timestamp}.log"
+
+        # Set environment variable to prevent recursive logging
+        export TERMINAL_LOGGING=1
+
+        # Start logging in the background with proper terminal handling
+        if [[ "$TERM" != "dumb" && -t 1 ]]; then
+            # Using typescript instead of script for better terminal handling
+            # -a: append mode
+            # -q: quiet mode
+            # -f: flush after each write
+            script -aqf "$log_file"
+
+            # Clean up when the shell exits
+            trap "unset TERMINAL_LOGGING" EXIT
+        else
+            echo "Terminal logging requires an interactive terminal"
+            return 1
+        fi
+    else
+        # We're already logging or in a non-interactive shell
+        return 0
+    fi
+}
+
+# Function to start a new logged session
+start_logging() {
+    if [[ -z "$TERMINAL_LOGGING" ]]; then
+        echo "Starting new logged session..."
+        terminal_logger
+    else
+        echo "Already in a logged session"
+    fi
+}
+
+EOF
+
 # Start a new Zsh shell
 exec zsh
