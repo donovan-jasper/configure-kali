@@ -277,6 +277,147 @@ install_additional_tools() {
     echo "To run linWinPwn Docker container, use:"
     echo "docker run --rm -it linwinpwn:latest"
 
+    # Create /opt/djasper/binaries and download specified files
+    echo "Setting up binaries folder..."
+    sudo mkdir -p "$DJASPER_DIR/binaries"
+
+    # Clone webshells
+    echo "Cloning webshells..."
+    if [ ! -d "$DJASPER_DIR/binaries/webshells" ]; then
+        sudo git clone https://github.com/BlackArch/webshells.git "$DJASPER_DIR/binaries/webshells"
+    else
+        echo "webshells already exists."
+    fi
+
+    # Create linux-binary directory and download files
+    echo "Setting up linux-binary tools..."
+    sudo mkdir -p "$DJASPER_DIR/binaries/linux-binary"
+    cd "$DJASPER_DIR/binaries/linux-binary"
+
+    # Download chisel binaries
+    if [ ! -f "chisel32" ]; then
+        sudo wget https://github.com/jpillora/chisel/releases/download/v1.9.1/chisel_1.9.1_linux_386.gz
+        sudo gunzip chisel_1.9.1_linux_386.gz
+        sudo mv chisel_1.9.1_linux_386 chisel32
+        sudo chmod +x chisel32
+    else
+        echo "chisel32 already exists."
+    fi
+    if [ ! -f "chisel64" ]; then
+        sudo wget https://github.com/jpillora/chisel/releases/download/v1.9.1/chisel_1.9.1_linux_amd64.gz
+        sudo gunzip chisel_1.9.1_linux_amd64.gz
+        sudo mv chisel_1.9.1_linux_amd64 chisel64
+        sudo chmod +x chisel64
+    else
+        echo "chisel64 already exists."
+    fi
+
+    # Clone LinEnum
+    if [ ! -d "LinEnum" ]; then
+        sudo git clone https://github.com/rebootuser/LinEnum.git
+    else
+        echo "LinEnum already exists."
+    fi
+
+    # Download linpeas.sh
+    if [ ! -f "linpeas.sh" ]; then
+        sudo wget https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh
+        sudo chmod +x linpeas.sh
+    else
+        echo "linpeas.sh already exists."
+    fi
+
+    # Download pspy64
+    if [ ! -f "pspy64" ]; then
+        sudo wget https://github.com/DominicBreuker/pspy/releases/download/v1.2.1/pspy64
+        sudo chmod +x pspy64
+    else
+        echo "pspy64 already exists."
+    fi
+
+    # Return to the main directory
+    cd "$DJASPER_DIR/binaries"
+
+    # Create windows-binary directory and download files
+    echo "Setting up windows-binary tools..."
+    sudo mkdir -p "$DJASPER_DIR/binaries/windows-binary"
+    cd "$DJASPER_DIR/binaries/windows-binary"
+
+    # Download chisel binaries
+    if [ ! -f "chisel32.exe" ]; then
+        sudo wget https://github.com/jpillora/chisel/releases/download/v1.9.1/chisel_1.9.1_windows_386.gz
+        sudo gunzip chisel_1.9.1_windows_386.gz
+        sudo mv chisel_1.9.1_windows_386 chisel32.exe
+    else
+        echo "chisel32.exe already exists."
+    fi
+    if [ ! -f "chisel64.exe" ]; then
+        sudo wget https://github.com/jpillora/chisel/releases/download/v1.9.1/chisel_1.9.1_windows_amd64.gz
+        sudo gunzip chisel_1.9.1_windows_amd64.gz
+        sudo mv chisel_1.9.1_windows_amd64 chisel64.exe
+    else
+        echo "chisel64.exe already exists."
+    fi
+
+    # Download winPEASx64.exe
+    if [ ! -f "winPEASx64.exe" ]; then
+        sudo wget https://github.com/peass-ng/PEASS-ng/releases/latest/download/winPEASx64.exe
+    else
+        echo "winPEASx64.exe already exists."
+    fi
+
+    # Clone nc.exe
+    if [ ! -d "nc.exe" ]; then
+        sudo git clone https://github.com/int0x33/nc.exe.git
+    else
+        echo "nc.exe already exists."
+    fi
+
+    # Clone mimikatz
+    if [ ! -d "mimikatz" ]; then
+        sudo git clone https://github.com/ParrotSec/mimikatz.git
+    else
+        echo "mimikatz already exists."
+    fi
+
+    # Download Rubeus.exe
+    if [ ! -f "Rubeus.exe" ]; then
+        sudo wget https://github.com/r3motecontrol/Ghostpack-CompiledBinaries/raw/master/Rubeus.exe
+    else
+        echo "Rubeus.exe already exists."
+    fi
+
+    # Download Certify.exe
+    if [ ! -f "Certify.exe" ]; then
+        sudo wget https://github.com/r3motecontrol/Ghostpack-CompiledBinaries/raw/master/Certify.exe
+    else
+        echo "Certify.exe already exists."
+    fi
+
+    # Download SharpHound.exe
+    if [ ! -f "SharpHound.exe" ]; then
+        sudo wget https://github.com/BloodHoundAD/BloodHound/raw/master/Collectors/SharpHound.exe
+    else
+        echo "SharpHound.exe already exists."
+    fi
+
+    # Clone Powermad
+    if [ ! -d "Powermad" ]; then
+        sudo git clone https://github.com/Kevin-Robertson/Powermad.git
+    else
+        echo "Powermad already exists."
+    fi
+
+    # Download PowerView.ps1
+    if [ ! -f "PowerView.ps1" ]; then
+        sudo wget https://github.com/PowerShellMafia/PowerSploit/raw/master/Recon/PowerView.ps1
+    else
+        echo "PowerView.ps1 already exists."
+    fi
+
+    # Return to the main directory
+    cd "$DJASPER_DIR"
+
     # Create /opt/djasper/zerologon and download tools
     echo "Setting up zerologon tools..."
     sudo mkdir -p "$DJASPER_DIR/zerologon"
@@ -320,10 +461,6 @@ EOL
     else
         echo "Virtual environment already exists."
     fi
-
-    # Continue with other tools as necessary, creating venvs where required.
-
-    # The rest of the script remains the same as before, setting up other tools without changes.
 
     echo "----------------------------------------"
     echo "Additional tools installed successfully."

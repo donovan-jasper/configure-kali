@@ -61,48 +61,5 @@ fi
 # Add zsh-syntax-highlighting to the end of .zshrc
 echo "source $HOME/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" >> $HOME/.zshrc
 
-# Ensure the logs directory exists
-echo "Ensuring ~/logs directory exists..."
-mkdir -p ~/logs
-
-# Ensure the 'script' utility is installed
-if ! command -v script &> /dev/null
-then
-    echo "'script' command not found. Installing util-linux package..."
-    sudo apt-get update && sudo apt-get install util-linux -y
-else
-    echo "'script' command is already installed."
-fi
-
-# Add function to .zshrc to run the 'script' command and log output
-echo "Adding terminal session logging to .zshrc..."
-
-cat << 'EOF' >> $HOME/.zshrc
-
-# Function to run the 'script' command and log the terminal session
-run_startup_script() {
-    # Prevent recursion by checking if the script is already running
-    if [ -z "$SCRIPT_SESSION" ]; then
-        export SCRIPT_SESSION=true
-
-        local log_dir="$HOME/logs"
-        mkdir -p "$log_dir"
-        local timestamp=$(date +%Y%m%d_%H%M%S)
-        local log_file="$log_dir/log-$timestamp.log"
-
-        echo "Starting terminal session logging to $log_file"
-
-        # Start logging the terminal session using 'script'
-        # The '-q' flag runs 'script' in quiet mode
-        # The '-f' flag flushes output after each write
-        # The '-c' flag specifies the command to run (zsh in this case)
-        script -q -f "$log_file" -c zsh
-    fi
-}
-
-# Execute the startup script function
-run_startup_script
-EOF
-
 # Start a new Zsh shell
 exec zsh
