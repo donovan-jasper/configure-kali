@@ -1,10 +1,9 @@
 #!/bin/bash
-
 # Exit immediately if a command exits with a non-zero status
 set -e
 
 # Variables
-DJ_SAPER_DIR="/opt/djsaper"
+DJASPER_DIR="/opt/djasper"
 BLOODHOUND_DIR="/opt/BloodHound"
 WORDLIST_DIR="/usr/share/seclists/Discovery"
 DIRECTORY_WORDLIST="$WORDLIST_DIR/Web-Content/directory-list-2.3-medium.txt"
@@ -18,7 +17,7 @@ update_and_install_packages() {
     echo "Updating package list and installing dependencies..."
     echo "----------------------------------------"
     sudo apt update -y
-    sudo apt install -y docker-compose git gobuster feroxbuster seclists python3-pip
+    sudo apt install -y docker-compose git gobuster feroxbuster seclists python3-pip ldap-utils remmina rlwrap
     echo "----------------------------------------"
     echo "Package installation completed."
     echo "----------------------------------------"
@@ -76,18 +75,18 @@ install_or_update_bloodhound() {
 # Function to install Feroxbuster scripts
 install_feroxbuster_scripts() {
     echo "----------------------------------------"
-    echo "Setting up Feroxbuster scripts in $DJ_SAPER_DIR..."
+    echo "Setting up Feroxbuster scripts in $DJASPER_DIR..."
     echo "----------------------------------------"
 
     # Create the directory if it doesn't exist
-    sudo mkdir -p "$DJ_SAPER_DIR"
+    sudo mkdir -p "$DJASPER_DIR"
 
     # Function to create a script using here-doc
     create_script() {
         local script_name="$1"
         local script_description="$2"
         local script_content="$3"
-        local script_path="$DJ_SAPER_DIR/$script_name"
+        local script_path="$DJASPER_DIR/$script_name"
 
         if [ -f "$script_path" ]; then
             echo "$script_name already exists. Skipping creation."
@@ -149,16 +148,16 @@ EOL
     create_script "feroxbuster_subdomain.sh" "Runs feroxbuster for subdomain enumeration." "$SUBDOMAIN_CMD"
 
     echo "----------------------------------------"
-    echo "Feroxbuster scripts set up successfully in $DJ_SAPER_DIR."
+    echo "Feroxbuster scripts set up successfully in $DJASPER_DIR."
     echo "----------------------------------------"
 
-    # Add /opt/djsaper/ to PATH in zsh if not already present
-    if sudo -u "$USER_NAME" grep -q 'export PATH=.*\/opt/djsaper/' "$ZSHRC"; then
-        echo "/opt/djsaper/ is already in your PATH."
+    # Add /opt/djasper/ to PATH in zsh if not already present
+    if sudo -u "$USER_NAME" grep -q 'export PATH=.*\/opt/djasper/' "$ZSHRC"; then
+        echo "/opt/djasper/ is already in your PATH."
     else
-        echo "Adding /opt/djsaper/ to PATH in $ZSHRC..."
-        echo 'export PATH="$PATH:/opt/djsaper/"' | sudo tee -a "$ZSHRC" > /dev/null
-        echo "/opt/djsaper/ added to PATH successfully."
+        echo "Adding /opt/djasper/ to PATH in $ZSHRC..."
+        echo 'export PATH="$PATH:/opt/djasper/"' | sudo tee -a "$ZSHRC" > /dev/null
+        echo "/opt/djasper/ added to PATH successfully."
         echo "Reloading zsh configuration..."
         sudo -u "$USER_NAME" bash -c "source '$ZSHRC'"
     fi
@@ -167,7 +166,7 @@ EOL
 # Function to install Gobuster scripts
 install_gobuster_scripts() {
     echo "----------------------------------------"
-    echo "Setting up Gobuster scripts in $DJ_SAPER_DIR..."
+    echo "Setting up Gobuster scripts in $DJASPER_DIR..."
     echo "----------------------------------------"
 
     # Ensure Gobuster is installed
@@ -183,7 +182,7 @@ install_gobuster_scripts() {
         local script_name="$1"
         local script_description="$2"
         local script_content="$3"
-        local script_path="$DJ_SAPER_DIR/$script_name"
+        local script_path="$DJASPER_DIR/$script_name"
 
         if [ -f "$script_path" ]; then
             echo "$script_name already exists. Skipping creation."
@@ -215,12 +214,12 @@ EOL
     DNS_ENUM_CMD='gobuster dns -d "$DOMAIN" \
     -t "$THREADS" \
     -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-110000.txt \
-    -o "$DJ_SAPER_DIR/gobuster_dns_output.txt"'
+    -o "$DJASPER_DIR/gobuster_dns_output.txt"'
 
     VHOST_ENUM_CMD='gobuster vhost -u http://"$DOMAIN" \
     -t "$THREADS" \
     -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-110000.txt \
-    -o "$DJ_SAPER_DIR/gobuster_vhost_output.txt"'
+    -o "$DJASPER_DIR/gobuster_vhost_output.txt"'
 
     # Create gobuster_dns.sh
     create_script "gobuster_dns.sh" "Runs Gobuster for DNS subdomain enumeration." "$DNS_ENUM_CMD"
@@ -229,10 +228,254 @@ EOL
     create_script "gobuster_vhost.sh" "Runs Gobuster for Virtual Host enumeration." "$VHOST_ENUM_CMD"
 
     echo "----------------------------------------"
-    echo "Gobuster scripts set up successfully in $DJ_SAPER_DIR."
+    echo "Gobuster scripts set up successfully in $DJASPER_DIR."
     echo "----------------------------------------"
 
-    # Add /opt/djsaper/ to PATH in zsh if not already present (already handled in Feroxbuster section)
+    # Add /opt/djasper/ to PATH in zsh if not already present (already handled in Feroxbuster section)
+}
+
+# Function to install additional tools
+install_additional_tools() {
+    echo "----------------------------------------"
+    echo "Installing additional tools..."
+    echo "----------------------------------------"
+
+    # Unzip rockyou.txt.gz
+    echo "Unzipping rockyou.txt.gz..."
+    if [ -f "/usr/share/wordlists/rockyou.txt.gz" ]; then
+        sudo gunzip /usr/share/wordlists/rockyou.txt.gz
+        echo "rockyou.txt.gz unzipped successfully."
+    else
+        echo "rockyou.txt.gz not found or already unzipped."
+    fi
+
+    # Create the tools directory if it doesn't exist
+    sudo mkdir -p "$DJASPER_DIR"
+
+    # Download kerbrute into /opt/djasper
+    echo "Downloading kerbrute..."
+    if [ ! -f "$DJASPER_DIR/kerbrute" ]; then
+        sudo wget https://github.com/ropnop/kerbrute/releases/download/v1.0.3/kerbrute_linux_amd64 -O "$DJASPER_DIR/kerbrute"
+        sudo chmod +x "$DJASPER_DIR/kerbrute"
+        echo "kerbrute downloaded and made executable."
+    else
+        echo "kerbrute already exists in $DJASPER_DIR."
+    fi
+
+    # Create /opt/djasper/linux-binary and download tools
+    echo "Setting up linux-binary tools..."
+    sudo mkdir -p "$DJASPER_DIR/linux-binary"
+    # Download chisel 32-bit and 64-bit
+    if [ ! -f "$DJASPER_DIR/linux-binary/chisel32" ]; then
+        echo "Downloading chisel32..."
+        sudo wget https://github.com/jpillora/chisel/releases/download/v1.9.1/chisel_1.9.1_linux_386.gz -O "$DJASPER_DIR/linux-binary/chisel32.gz"
+        sudo gunzip "$DJASPER_DIR/linux-binary/chisel32.gz"
+        sudo chmod +x "$DJASPER_DIR/linux-binary/chisel32"
+    else
+        echo "chisel32 already exists."
+    fi
+    if [ ! -f "$DJASPER_DIR/linux-binary/chisel64" ]; then
+        echo "Downloading chisel64..."
+        sudo wget https://github.com/jpillora/chisel/releases/download/v1.9.1/chisel_1.9.1_linux_amd64.gz -O "$DJASPER_DIR/linux-binary/chisel64.gz"
+        sudo gunzip "$DJASPER_DIR/linux-binary/chisel64.gz"
+        sudo chmod +x "$DJASPER_DIR/linux-binary/chisel64"
+    else
+        echo "chisel64 already exists."
+    fi
+    # Clone LinEnum
+    if [ ! -d "$DJASPER_DIR/linux-binary/LinEnum" ]; then
+        echo "Cloning LinEnum..."
+        sudo git clone https://github.com/rebootuser/LinEnum.git "$DJASPER_DIR/linux-binary/LinEnum"
+    else
+        echo "LinEnum already exists."
+    fi
+    # Download linpeas.sh
+    if [ ! -f "$DJASPER_DIR/linux-binary/linpeas.sh" ]; then
+        echo "Downloading linpeas.sh..."
+        sudo wget https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh -O "$DJASPER_DIR/linux-binary/linpeas.sh"
+        sudo chmod +x "$DJASPER_DIR/linux-binary/linpeas.sh"
+    else
+        echo "linpeas.sh already exists."
+    fi
+    # Download pspy64
+    if [ ! -f "$DJASPER_DIR/linux-binary/pspy64" ]; then
+        echo "Downloading pspy64..."
+        sudo wget https://github.com/DominicBreuker/pspy/releases/download/v1.2.1/pspy64 -O "$DJASPER_DIR/linux-binary/pspy64"
+        sudo chmod +x "$DJASPER_DIR/linux-binary/pspy64"
+    else
+        echo "pspy64 already exists."
+    fi
+
+    # Create /opt/djasper/windows-binary and download tools
+    echo "Setting up windows-binary tools..."
+    sudo mkdir -p "$DJASPER_DIR/windows-binary"
+    # Download chisel 32-bit and 64-bit for Windows
+    if [ ! -f "$DJASPER_DIR/windows-binary/chisel32.exe" ]; then
+        echo "Downloading chisel32 for Windows..."
+        sudo wget https://github.com/jpillora/chisel/releases/download/v1.9.1/chisel_1.9.1_windows_386.gz -O "$DJASPER_DIR/windows-binary/chisel32.gz"
+        sudo gunzip "$DJASPER_DIR/windows-binary/chisel32.gz"
+        sudo mv "$DJASPER_DIR/windows-binary/chisel32" "$DJASPER_DIR/windows-binary/chisel32.exe"
+    else
+        echo "chisel32.exe already exists."
+    fi
+    if [ ! -f "$DJASPER_DIR/windows-binary/chisel64.exe" ]; then
+        echo "Downloading chisel64 for Windows..."
+        sudo wget https://github.com/jpillora/chisel/releases/download/v1.9.1/chisel_1.9.1_windows_amd64.gz -O "$DJASPER_DIR/windows-binary/chisel64.gz"
+        sudo gunzip "$DJASPER_DIR/windows-binary/chisel64.gz"
+        sudo mv "$DJASPER_DIR/windows-binary/chisel64" "$DJASPER_DIR/windows-binary/chisel64.exe"
+    else
+        echo "chisel64.exe already exists."
+    fi
+    # Download winPEASx64.exe
+    if [ ! -f "$DJASPER_DIR/windows-binary/winPEASx64.exe" ]; then
+        echo "Downloading winPEASx64.exe..."
+        sudo wget https://github.com/peass-ng/PEASS-ng/releases/latest/download/winPEASx64.exe -O "$DJASPER_DIR/windows-binary/winPEASx64.exe"
+    else
+        echo "winPEASx64.exe already exists."
+    fi
+    # Clone nc.exe
+    if [ ! -d "$DJASPER_DIR/windows-binary/nc.exe" ]; then
+        echo "Cloning nc.exe..."
+        sudo git clone https://github.com/int0x33/nc.exe.git "$DJASPER_DIR/windows-binary/nc.exe"
+    else
+        echo "nc.exe already exists."
+    fi
+    # Clone mimikatz
+    if [ ! -d "$DJASPER_DIR/windows-binary/mimikatz" ]; then
+        echo "Cloning mimikatz..."
+        sudo git clone https://github.com/ParrotSec/mimikatz.git "$DJASPER_DIR/windows-binary/mimikatz"
+    else
+        echo "mimikatz already exists."
+    fi
+    # Download Rubeus.exe and Certify.exe
+    if [ ! -f "$DJASPER_DIR/windows-binary/Rubeus.exe" ]; then
+        echo "Downloading Rubeus.exe..."
+        sudo wget https://github.com/r3motecontrol/Ghostpack-CompiledBinaries/raw/master/Rubeus.exe -O "$DJASPER_DIR/windows-binary/Rubeus.exe"
+    else
+        echo "Rubeus.exe already exists."
+    fi
+    if [ ! -f "$DJASPER_DIR/windows-binary/Certify.exe" ]; then
+        echo "Downloading Certify.exe..."
+        sudo wget https://github.com/r3motecontrol/Ghostpack-CompiledBinaries/raw/master/Certify.exe -O "$DJASPER_DIR/windows-binary/Certify.exe"
+    else
+        echo "Certify.exe already exists."
+    fi
+    # Download SharpHound.exe
+    if [ ! -f "$DJASPER_DIR/windows-binary/SharpHound.exe" ]; then
+        echo "Downloading SharpHound.exe..."
+        sudo wget https://github.com/BloodHoundAD/BloodHound/raw/master/Collectors/SharpHound.exe -O "$DJASPER_DIR/windows-binary/SharpHound.exe"
+    else
+        echo "SharpHound.exe already exists."
+    fi
+    # Clone Powermad
+    if [ ! -d "$DJASPER_DIR/windows-binary/Powermad" ]; then
+        echo "Cloning Powermad..."
+        sudo git clone https://github.com/Kevin-Robertson/Powermad.git "$DJASPER_DIR/windows-binary/Powermad"
+    else
+        echo "Powermad already exists."
+    fi
+    # Download PowerView.ps1
+    if [ ! -f "$DJASPER_DIR/windows-binary/PowerView.ps1" ]; then
+        echo "Downloading PowerView.ps1..."
+        sudo wget https://github.com/PowerShellMafia/PowerSploit/raw/master/Recon/PowerView.ps1 -O "$DJASPER_DIR/windows-binary/PowerView.ps1"
+    else
+        echo "PowerView.ps1 already exists."
+    fi
+
+    # Create /opt/djasper/webapp and download tools
+    echo "Setting up webapp tools..."
+    sudo mkdir -p "$DJASPER_DIR/webapp"
+    # Clone webshells
+    if [ ! -d "$DJASPER_DIR/webapp/webshells" ]; then
+        echo "Cloning webshells..."
+        sudo git clone https://github.com/BlackArch/webshells.git "$DJASPER_DIR/webapp/webshells"
+    else
+        echo "webshells already exists."
+    fi
+    # Clone phpggc
+    if [ ! -d "$DJASPER_DIR/webapp/phpggc" ]; then
+        echo "Cloning phpggc..."
+        sudo git clone https://github.com/ambionics/phpggc.git "$DJASPER_DIR/webapp/phpggc"
+    else
+        echo "phpggc already exists."
+    fi
+    # Install Google Chrome
+    echo "Installing Google Chrome..."
+    if ! command -v google-chrome &> /dev/null; then
+        sudo wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome.deb
+        sudo dpkg -i /tmp/google-chrome.deb || sudo apt-get install -f -y
+        sudo rm /tmp/google-chrome.deb
+        echo "Google Chrome installed successfully."
+    else
+        echo "Google Chrome is already installed."
+    fi
+
+    # Create /opt/djasper/zerologon and download tools
+    echo "Setting up zerologon tools..."
+    sudo mkdir -p "$DJASPER_DIR/zerologon"
+    if [ ! -f "$DJASPER_DIR/zerologon/zerologon_tester.py" ]; then
+        echo "Downloading zerologon_tester.py..."
+        sudo wget https://github.com/SecuraBV/CVE-2020-1472/raw/master/zerologon_tester.py -O "$DJASPER_DIR/zerologon/zerologon_tester.py"
+    else
+        echo "zerologon_tester.py already exists."
+    fi
+    if [ ! -f "$DJASPER_DIR/zerologon/cve-2020-1472-exploit.py" ]; then
+        echo "Downloading cve-2020-1472-exploit.py..."
+        sudo wget https://github.com/dirkjanm/CVE-2020-1472/raw/master/cve-2020-1472-exploit.py -O "$DJASPER_DIR/zerologon/cve-2020-1472-exploit.py"
+    else
+        echo "cve-2020-1472-exploit.py already exists."
+    fi
+    if [ ! -f "$DJASPER_DIR/zerologon/restorepassword.py" ]; then
+        echo "Downloading restorepassword.py..."
+        sudo wget https://github.com/dirkjanm/CVE-2020-1472/raw/master/restorepassword.py -O "$DJASPER_DIR/zerologon/restorepassword.py"
+    else
+        echo "restorepassword.py already exists."
+    fi
+    # Create Syntax-Notes file
+    if [ ! -f "$DJASPER_DIR/zerologon/Syntax-Notes" ]; then
+        echo "Creating Syntax-Notes..."
+        sudo tee "$DJASPER_DIR/zerologon/Syntax-Notes" > /dev/null <<EOL
+for zerologon tester and exploit, it's: python3 (script) (NetBIOS name) (ip)
+for password restoring it's: python3 restorepassword.py (domain-name)/(NetBIOS name)@(NetBIOS name) -target-ip (ip) -hexpass (hex hash)
+EOL
+    else
+        echo "Syntax-Notes already exists."
+    fi
+
+    # Create /opt/djasper/rev-eng and download tools
+    echo "Setting up rev-eng tools..."
+    sudo mkdir -p "$DJASPER_DIR/rev-eng"
+    if [ ! -f "$DJASPER_DIR/rev-eng/ILSpy-linux-x64-Release.zip" ]; then
+        echo "Downloading ILSpy..."
+        sudo wget https://github.com/icsharpcode/AvaloniaILSpy/releases/download/v7.2-rc/Linux.x64.Release.zip -O "$DJASPER_DIR/rev-eng/Linux.x64.Release.zip"
+        sudo unzip "$DJASPER_DIR/rev-eng/Linux.x64.Release.zip" -d "$DJASPER_DIR/rev-eng"
+    else
+        echo "ILSpy already exists."
+    fi
+
+    # Clone linWinPwn and set up
+    echo "Cloning linWinPwn..."
+    if [ ! -d "$DJASPER_DIR/linWinPwn" ]; then
+        sudo git clone https://github.com/lefayjey/linWinPwn "$DJASPER_DIR/linWinPwn"
+        sudo chown -R "$USER_NAME:$USER_NAME" "$DJASPER_DIR/linWinPwn"
+        echo "linWinPwn cloned successfully."
+    else
+        echo "linWinPwn already exists. Pulling latest changes..."
+        sudo git -C "$DJASPER_DIR/linWinPwn" pull
+    fi
+
+    # Make linWinPwn.sh executable
+    echo "Making linWinPwn.sh executable..."
+    chmod +x "$DJASPER_DIR/linWinPwn/linWinPwn.sh"
+
+    # Run install.sh as standard user
+    echo "Installing linWinPwn requirements..."
+    chmod +x "$DJASPER_DIR/linWinPwn/install.sh"
+    sudo -u "$USER_NAME" bash -c "cd '$DJASPER_DIR/linWinPwn' && ./install.sh"
+
+    echo "----------------------------------------"
+    echo "Additional tools installed successfully."
+    echo "----------------------------------------"
 }
 
 # Function to update installed tools
@@ -249,11 +492,12 @@ update_tools() {
         echo "BloodHound is not installed. Skipping update."
     fi
 
-    # Update Feroxbuster scripts
-    if [ -d "$DJ_SAPER_DIR" ]; then
-        echo "Updating Feroxbuster scripts..."
+    # Update Feroxbuster and Gobuster scripts
+    if [ -d "$DJASPER_DIR" ]; then
+        echo "Updating Feroxbuster and Gobuster scripts..."
         install_feroxbuster_scripts
         install_gobuster_scripts
+        install_additional_tools
     else
         echo "Feroxbuster scripts are not installed. Skipping update."
     fi
@@ -271,9 +515,10 @@ show_menu() {
     echo "2. Install BloodHound"
     echo "3. Install Feroxbuster"
     echo "4. Install Gobuster"
+    echo "5. Install Additional Tools"
     echo "A. Install All of the Above"
     echo "----------------------------------------"
-    echo -n "Enter your choice (1-4 or A): "
+    echo -n "Enter your choice (1-5 or A): "
     read -r choice
 }
 
@@ -289,10 +534,12 @@ handle_selection() {
             ;;
         3)
             install_feroxbuster_scripts
-            install_gobuster_scripts
             ;;
         4)
             install_gobuster_scripts
+            ;;
+        5)
+            install_additional_tools
             ;;
         A|a)
             echo "Installing all tools..."
@@ -300,6 +547,7 @@ handle_selection() {
             install_or_update_bloodhound
             install_feroxbuster_scripts
             install_gobuster_scripts
+            install_additional_tools
             echo "----------------------------------------"
             echo "All tools have been installed/updated successfully."
             echo "----------------------------------------"
@@ -334,7 +582,9 @@ main() {
     echo " - gobuster_dns.sh <DOMAIN> [threads]"
     echo " - gobuster_vhost.sh <DOMAIN> [threads]"
     echo "----------------------------------------"
-    echo "To use Feroxbuster and Gobuster scripts without specifying the full path, ensure /opt/djsaper/ is in your PATH."
+    echo "If you installed Additional Tools, they are located in $DJASPER_DIR"
+    echo "----------------------------------------"
+    echo "To use Feroxbuster and Gobuster scripts without specifying the full path, ensure $DJASPER_DIR is in your PATH."
     echo "----------------------------------------"
 }
 
