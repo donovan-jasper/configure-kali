@@ -113,6 +113,8 @@ start_logging() {
     fi
 }
 
+start_logging
+
 EOF
 
 # Start a new Zsh shell
